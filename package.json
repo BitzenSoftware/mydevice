@@ -1,8 +1,8 @@
 {
-  "name": "device-mockup",
+  "name": "mydevice",
   "version": "1.0.0",
   "private": true,
-  "description": "Visualize um site dentro de molduras de celular, tablet e desktop, e baixe o mockup em PNG transparente.",
+  "description": "mydevice - veja e navegue por qualquer site dentro de molduras de celular, tablet e desktop, e baixe o mockup em PNG transparente.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

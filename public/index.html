@@ -3,16 +3,88 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Visualizador de Dispositivos</title>
+<title>mydevice — Veja seu site em molduras de celular, tablet e desktop</title>
+<meta name="description" content="Digite a URL e navegue pelo seu site dentro de molduras realistas de iPhone, Android, iPad e desktop. Emulação de verdade: o site reconhece que está num celular. Baixe o mockup em PNG com fundo transparente.">
+<link rel="canonical" href="{{CANONICAL}}/">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="mydevice">
+<meta property="og:title" content="mydevice — Veja seu site em molduras de celular, tablet e desktop">
+<meta property="og:description" content="Navegue pelo seu site dentro de molduras realistas de aparelhos e baixe o mockup em PNG transparente.">
+<meta property="og:url" content="{{CANONICAL}}/">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="mydevice — Veja seu site em molduras de dispositivo">
+<meta name="twitter:description" content="Navegue pelo seu site dentro de molduras realistas de aparelhos e baixe o mockup em PNG transparente.">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='9' y='2' width='14' height='28' rx='4' fill='%236c8dff'/%3E%3Crect x='11' y='6' width='10' height='20' rx='1' fill='%230f1115'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "mydevice",
+      "url": "{{CANONICAL}}/",
+      "applicationCategory": "DesignApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "pt-BR",
+      "description": "Ferramenta web que abre qualquer site dentro de molduras realistas de celular, tablet e desktop, com navegação ao vivo, emulação real de dispositivo móvel e download do mockup em PNG com fundo transparente.",
+      "featureList": [
+        "Navegação ao vivo dentro da moldura",
+        "Emulação real de dispositivo móvel (user-agent, toque e viewport)",
+        "10 modelos de aparelho entre celulares, tablets e desktop",
+        "Cores de moldura personalizáveis",
+        "Download do mockup em PNG com fundo transparente"
+      ],
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "O site dentro da moldura é navegável ou é só uma imagem?",
+          "acceptedAnswer": { "@type": "Answer", "text": "É navegável. O site roda de verdade num navegador no servidor e a tela é transmitida ao vivo, então você clica em botões, rola a página, preenche formulários e troca de tela normalmente." }
+        },
+        {
+          "@type": "Question",
+          "name": "Meu site em PWA vai reconhecer que está num celular?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Sim. A página é aberta com emulação completa do aparelho escolhido: user-agent móvel, eventos de toque e a resolução exata do viewport. Isso é diferente de embutir o site num iframe, onde ele herdaria o user-agent de desktop e mostraria o layout errado." }
+        },
+        {
+          "@type": "Question",
+          "name": "Funciona com sites que bloqueiam iframe?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Sim. Como nada é embutido no seu navegador, restrições de X-Frame-Options e Content-Security-Policy não se aplicam. Sites que recusam ser incorporados aparecem normalmente." }
+        },
+        {
+          "@type": "Question",
+          "name": "O PNG baixado vem com fundo transparente?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Vem. O download traz apenas o aparelho com a tela dentro, sem fundo, pronto para montar sobre qualquer arte, apresentação ou página de vendas." }
+        },
+        {
+          "@type": "Question",
+          "name": "Posso visualizar um site que ainda está em desenvolvimento?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Se o endereço for público, sim. Endereços internos como localhost e redes privadas são recusados na versão publicada por segurança. Rodando o projeto na sua própria máquina, a trava fica desligada e você consegue apontar para o seu ambiente local." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+{{ADSENSE_HEAD}}
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
+    <a class="brand" href="/">
       <span class="brand-dot"></span>
-      <h1>Visualizador de Dispositivos</h1>
-    </div>
+      <span class="brand-name">mydevice</span>
+    </a>
     <form id="url-form" class="url-form">
+      <label class="sr-only" for="url-input">Endereço do site que você quer visualizar</label>
       <input id="url-input" type="text" placeholder="digite.com/o-site-aqui" autocomplete="off" spellcheck="false">
       <button type="submit" id="load-btn">Carregar</button>
     </form>
@@ -28,7 +100,7 @@
       <div class="color-list" id="color-list"></div>
     </aside>
 
-    <section class="stage-wrap">
+    <section class="stage-wrap" aria-label="Pré-visualização do site na moldura escolhida">
       <div class="stage" id="stage">
         <canvas id="preview-canvas" class="hidden"></canvas>
         <div id="idle-placeholder" class="idle-placeholder">Digite uma URL e clique em Carregar</div>
@@ -44,6 +116,142 @@
       </div>
     </section>
   </main>
+
+  <article class="content">
+    <h1>mydevice: veja seu site rodando dentro de um celular de verdade</h1>
+    <p class="lead">
+      O <strong>mydevice</strong> abre qualquer site dentro de uma moldura realista de celular,
+      tablet ou computador — e o site continua funcionando. Você clica nos botões, rola a página,
+      aceita o aviso de cookies, entra no menu e navega entre telas, tudo dentro do aparelho.
+      Quando a tela estiver do jeito que você quer, um botão baixa o mockup pronto em PNG com
+      fundo transparente.
+    </p>
+
+    {{AD_SLOT_1}}
+
+    <h2 id="como-usar">Como usar em quatro passos</h2>
+    <ol class="steps">
+      <li><strong>Cole o endereço</strong> do site no campo lá em cima e clique em Carregar.</li>
+      <li><strong>Escolha o aparelho</strong> na lateral, entre celulares, tablets e telas de desktop.</li>
+      <li><strong>Navegue até a tela</strong> que você quer mostrar, clicando e rolando dentro da moldura.</li>
+      <li><strong>Escolha a cor</strong> da moldura e clique em Baixar moldura.</li>
+    </ol>
+
+    <h2 id="emulacao">Por que a emulação de verdade faz diferença</h2>
+    <p>
+      A maioria das ferramentas de mockup faz uma de duas coisas: cola um print estático dentro de
+      um desenho de celular, ou embute o site num <code>iframe</code>. As duas têm limites sérios.
+    </p>
+    <p>
+      Um print é uma imagem parada — não dá para navegar até a tela interna que você precisa
+      mostrar. Já o <code>iframe</code> roda dentro do <em>seu</em> navegador, então o site enxerga
+      o user-agent de um computador e entrega o layout de desktop, mesmo espremido num retângulo do
+      tamanho de um celular. Aplicações web modernas e PWAs decidem o que mostrar com base nesses
+      sinais, e por isso aparecem erradas. Fora que muitos sites recusam ser embutidos, e a moldura
+      fica em branco.
+    </p>
+    <p>
+      No mydevice o site é aberto num navegador real, no servidor, com o aparelho escolhido
+      emulado por completo: <strong>user-agent móvel, eventos de toque e a resolução exata do
+      viewport</strong>. O site recebe exatamente os mesmos sinais que receberia de um aparelho
+      físico e entrega o layout móvel de verdade. Como nada é embutido no seu navegador, restrições
+      de <code>X-Frame-Options</code> e <code>Content-Security-Policy</code> deixam de ser um
+      problema.
+    </p>
+
+    <h2 id="aparelhos">Aparelhos disponíveis</h2>
+    <p>Cada modelo usa a resolução lógica e a densidade de tela do aparelho real:</p>
+    <div class="table-wrap">
+      <table>
+        <caption>Modelos de aparelho e suas resoluções de viewport</caption>
+        <thead>
+          <tr><th scope="col">Aparelho</th><th scope="col">Categoria</th><th scope="col">Viewport</th><th scope="col">Detalhe da tela</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>iPhone 15 Pro</td><td>Celular</td><td>393 × 852</td><td>Ilha dinâmica</td></tr>
+          <tr><td>iPhone SE</td><td>Celular</td><td>375 × 667</td><td>Bordas e botão físico</td></tr>
+          <tr><td>Samsung Galaxy S23</td><td>Celular</td><td>360 × 780</td><td>Furo na tela</td></tr>
+          <tr><td>Google Pixel 8</td><td>Celular</td><td>412 × 915</td><td>Furo na tela</td></tr>
+          <tr><td>iPad Pro 11"</td><td>Tablet</td><td>834 × 1194</td><td>Bordas finas</td></tr>
+          <tr><td>iPad Mini</td><td>Tablet</td><td>744 × 1133</td><td>Corpo claro</td></tr>
+          <tr><td>Galaxy Tab S9</td><td>Tablet</td><td>800 × 1280</td><td>Furo na tela</td></tr>
+          <tr><td>MacBook Pro 14"</td><td>Desktop</td><td>1440 × 900</td><td>Tampa e base</td></tr>
+          <tr><td>Monitor / iMac</td><td>Desktop</td><td>1600 × 900</td><td>Pedestal</td></tr>
+          <tr><td>Janela do Navegador</td><td>Desktop</td><td>1280 × 800</td><td>Barra de endereço</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    {{AD_SLOT_2}}
+
+    <h2 id="para-quem">Para quem isso serve</h2>
+    <ul class="cards">
+      <li>
+        <h3>Agências e freelancers</h3>
+        <p>Apresente o site do cliente como ele aparece no celular, sem precisar fotografar
+        um aparelho ou montar a moldura no editor de imagem.</p>
+      </li>
+      <li>
+        <h3>Times de produto</h3>
+        <p>Confira como uma tela interna se comporta em várias resoluções antes de publicar,
+        navegando até ela em vez de depender de prints soltos.</p>
+      </li>
+      <li>
+        <h3>Lojas e páginas de venda</h3>
+        <p>Gere as imagens do produto para a página, o anúncio ou o post com a moldura
+        recortada em PNG transparente, pronta para montar sobre qualquer fundo.</p>
+      </li>
+      <li>
+        <h3>Documentação e propostas</h3>
+        <p>Ilustre manuais, apresentações e propostas comerciais com telas reais do sistema
+        dentro do aparelho certo.</p>
+      </li>
+    </ul>
+
+    <h2 id="perguntas">Perguntas frequentes</h2>
+    <div class="faq">
+      <h3>O site dentro da moldura é navegável ou é só uma imagem?</h3>
+      <p>É navegável. O site roda de verdade num navegador no servidor e a tela é transmitida
+      ao vivo, então você clica em botões, rola a página, preenche formulários e troca de tela
+      normalmente.</p>
+
+      <h3>Meu site em PWA vai reconhecer que está num celular?</h3>
+      <p>Sim. A página é aberta com emulação completa do aparelho escolhido: user-agent móvel,
+      eventos de toque e a resolução exata do viewport. Isso é diferente de embutir o site num
+      iframe, onde ele herdaria o user-agent de desktop e mostraria o layout errado.</p>
+
+      <h3>Funciona com sites que bloqueiam iframe?</h3>
+      <p>Sim. Como nada é embutido no seu navegador, restrições de X-Frame-Options e
+      Content-Security-Policy não se aplicam. Sites que recusam ser incorporados aparecem
+      normalmente.</p>
+
+      <h3>O PNG baixado vem com fundo transparente?</h3>
+      <p>Vem. O download traz apenas o aparelho com a tela dentro, sem fundo, pronto para montar
+      sobre qualquer arte, apresentação ou página de vendas.</p>
+
+      <h3>Posso visualizar um site que ainda está em desenvolvimento?</h3>
+      <p>Se o endereço for público, sim. Endereços internos como localhost e redes privadas são
+      recusados na versão publicada por segurança. Rodando o projeto na sua própria máquina, a
+      trava fica desligada e você consegue apontar para o seu ambiente local.</p>
+
+      <h3>A imagem fica nítida mesmo em tela de alta densidade?</h3>
+      <p>Fica. Enquanto você interage, a transmissão prioriza a fluidez; assim que você para, a
+      tela é reenviada na densidade de pixels real do aparelho — três vezes a resolução lógica
+      num iPhone 15 Pro, por exemplo. O download sempre usa a versão em alta resolução.</p>
+    </div>
+  </article>
+
+  <footer class="site-footer">
+    <p><strong>mydevice</strong> — visualize e capture sites em molduras de aparelhos.</p>
+    <nav>
+      <a href="/privacidade">Política de privacidade</a>
+      <a href="/llms.txt">llms.txt</a>
+    </nav>
+    <p class="disclaimer">
+      Nomes de aparelhos são citados apenas para identificar o formato de tela reproduzido.
+      mydevice não tem vínculo com Apple, Samsung ou Google.
+    </p>
+  </footer>
 
   <script src="app.js"></script>
 </body>

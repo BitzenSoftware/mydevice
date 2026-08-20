@@ -1,4 +1,4 @@
-# Device Mockup
+# mydevice
 
 Digite a URL de um site e veja-o rodando **de verdade** dentro de uma moldura de
 celular, tablet ou desktop — navegável, com a cor da moldura à sua escolha e com
@@ -55,6 +55,9 @@ fly deploy
 | `MAX_SESSIONS` | `6` | Sessões simultâneas. Cada uma é uma aba de Chrome viva — subir demais estoura a memória |
 | `ALLOW_PRIVATE_HOSTS` | `0` em produção | Deixa abrir endereços internos. **Mantenha desligado** em servidor público |
 | `PUPPETEER_EXECUTABLE_PATH` | `/usr/bin/chromium` | Caminho do navegador |
+| `PUBLIC_URL` | `http://localhost:5177` | Domínio público. Usado na URL canônica, no sitemap e no llms.txt — **defina no deploy**, senão o SEO aponta para localhost |
+| `ADSENSE_CLIENT` | vazio | ID do publisher (`ca-pub-...`). Sem ele, nenhum anúncio é carregado e `/ads.txt` responde 404 |
+| `ADSENSE_SLOT_1`, `ADSENSE_SLOT_2` | vazio | IDs dos blocos de anúncio criados no painel do AdSense |
 
 Reserve pelo menos **1 GB de RAM**: Chromium com várias abas não cabe nos planos
 gratuitos mais apertados. Comece com `MAX_SESSIONS=2` se a memória for pouca.
@@ -88,3 +91,34 @@ Enquanto você interage, vale o screencast (fluido, ~20 fps, ~40 ms de resposta 
 clique). Assim que você para, o screencast é desligado e a tela passa a ser
 enviada em alta resolução. Desligar importa: numa página que se atualiza sozinha
 (um relógio, por exemplo) os quadros 1x ficariam apagando os nítidos.
+
+## Leitura por buscadores e IA
+
+O conteúdo da página está em HTML de verdade e é lido sem executar JavaScript
+(cerca de 900 palavras no HTML bruto), com dados estruturados JSON-LD
+(`SoftwareApplication` e `FAQPage`).
+
+| Rota | Para que serve |
+| --- | --- |
+| `/robots.txt` | Libera explicitamente rastreadores de IA (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, CCBot e outros) |
+| `/llms.txt` | Resumo do site em formato legível por modelos de linguagem |
+| `/sitemap.xml` | Mapa das páginas |
+| `/ads.txt` | Gerado a partir de `ADSENSE_CLIENT`; some se a variável não estiver definida |
+| `/privacidade` | Política de privacidade, exigida pelo AdSense |
+
+## Sobre o AdSense
+
+Os blocos só aparecem quando `ADSENSE_CLIENT` está definido — enquanto a conta
+não é aprovada, o site fica sem espaços vazios.
+
+Vale saber de dois riscos antes de submeter para aprovação:
+
+1. A ferramenta exibe **sites de terceiros**. O AdSense tem política contra
+   veicular anúncios em telas cujo conteúdo não pertence ao publisher. Por isso
+   os blocos de anúncio ficam apenas na área de conteúdo próprio, abaixo da
+   ferramenta, e nunca ao lado da moldura.
+2. Sites que são só ferramenta costumam ser reprovados por conteúdo
+   insuficiente. Por isso a página traz documentação própria, tabela de
+   aparelhos e FAQ.
+
+Mesmo assim, a aprovação é decisão do Google.

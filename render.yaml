@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: device-mockup
+    name: mydevice
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: starter        # o plano free tem pouca RAM para rodar o Chromium
@@ -8,3 +8,15 @@ services:
     envVars:
       - key: MAX_SESSIONS
         value: "6"
+      # Defina com o dominio real depois do primeiro deploy, senao a URL
+      # canonica, o sitemap e o llms.txt vao apontar para localhost.
+      - key: PUBLIC_URL
+        sync: false
+      # Preencha quando a conta do AdSense for aprovada. Sem isso, nenhum
+      # anuncio carrega e /ads.txt some.
+      - key: ADSENSE_CLIENT
+        sync: false
+      - key: ADSENSE_SLOT_1
+        sync: false
+      - key: ADSENSE_SLOT_2
+        sync: false

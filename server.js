@@ -66,7 +66,127 @@ function getBrowser() {
   return browserPromise;
 }
 
-app.use(express.static(path.join(__dirname, 'public')));
+// ---------- Páginas, SEO e leitura por IA ----------
+// O conteúdo do site fica em HTML de verdade, sem depender de JavaScript, para
+// que buscadores e rastreadores de IA consigam ler. As páginas passam por uma
+// substituição simples de marcadores (domínio canônico e blocos de anúncio).
+const ADSENSE_CLIENT = (process.env.ADSENSE_CLIENT || '').trim(); // ex.: ca-pub-0000000000000000
+const PUBLIC_URL = (process.env.PUBLIC_URL || `http://localhost:${PORT}`).replace(/\/+$/, '');
+
+const ADSENSE_HEAD = ADSENSE_CLIENT
+  ? `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}" crossorigin="anonymous"></script>`
+  : '';
+
+// Sem ADSENSE_CLIENT configurado o bloco sai vazio (o CSS esconde slots vazios),
+// então nada de espaço reservado sobrando enquanto a conta não está aprovada.
+const adSlot = slot => ADSENSE_CLIENT
+  ? `<div class="ad-slot"><ins class="adsbygoogle" style="display:block" data-ad-client="${ADSENSE_CLIENT}" data-ad-slot="${slot}" data-ad-format="auto" data-full-width-responsive="true"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div>`
+  : '';
+
+function renderPage(file) {
+  const html = fs.readFileSync(path.join(__dirname, 'public', file), 'utf8');
+  return html
+    .replace(/\{\{CANONICAL\}\}/g, PUBLIC_URL)
+    .replace(/\{\{ADSENSE_HEAD\}\}/g, ADSENSE_HEAD)
+    .replace(/\{\{AD_SLOT_1\}\}/g, adSlot(process.env.ADSENSE_SLOT_1 || ''))
+    .replace(/\{\{AD_SLOT_2\}\}/g, adSlot(process.env.ADSENSE_SLOT_2 || ''));
+}
+
+const sendPage = (res, file) => {
+  res.type('html').send(renderPage(file));
+};
+
+app.get('/', (_req, res) => sendPage(res, 'index.html'));
+app.get('/privacidade', (_req, res) => sendPage(res, 'privacidade.html'));
+
+// index: false para que a rota acima trate a home em vez do arquivo cru
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+
+// Rastreadores de IA são liberados explicitamente: a proposta é que o conteúdo
+// seja legível por assistentes, não só por buscadores tradicionais.
+app.get('/robots.txt', (_req, res) => {
+  const aiBots = [
+    'GPTBot', 'OAI-SearchBot', 'ChatGPT-User',
+    'ClaudeBot', 'Claude-Web', 'anthropic-ai',
+    'PerplexityBot', 'Perplexity-User',
+    'Google-Extended', 'Applebot', 'Applebot-Extended',
+    'CCBot', 'Amazonbot', 'Bytespider', 'meta-externalagent', 'cohere-ai',
+    'DuckAssistBot', 'MistralAI-User', 'YouBot', 'Diffbot', 'Timpibot',
+  ];
+  res.type('text/plain').send(
+    [
+      '# mydevice — leitura liberada para buscadores e assistentes de IA',
+      ...aiBots.flatMap(bot => [`User-agent: ${bot}`, 'Allow: /', '']),
+      'User-agent: *',
+      'Allow: /',
+      'Disallow: /ws/',
+      'Disallow: /health',
+      '',
+      `Sitemap: ${PUBLIC_URL}/sitemap.xml`,
+      '',
+    ].join('\n')
+  );
+});
+
+// Resumo legível por máquina, no formato llms.txt.
+app.get('/llms.txt', (_req, res) => {
+  res.type('text/plain').send(`# mydevice
+
+> Ferramenta web gratuita que abre qualquer site dentro de molduras realistas de
+> celular, tablet e desktop. O site continua navegável dentro da moldura e o
+> mockup pode ser baixado em PNG com fundo transparente.
+
+## O que a ferramenta faz
+
+- Abre uma URL pública dentro da moldura do aparelho escolhido.
+- O site é navegável: aceita cliques, rolagem, digitação e troca de telas.
+- Emula o aparelho de verdade (user-agent móvel, eventos de toque e viewport),
+  então PWAs e sites responsivos entregam o layout móvel correto.
+- Funciona com sites que bloqueiam incorporação via iframe, porque a página é
+  aberta num navegador no servidor e não embutida no navegador do visitante.
+- Exporta o resultado em PNG com fundo transparente, contendo apenas o aparelho.
+
+## Aparelhos disponíveis
+
+Celulares: iPhone 15 Pro (393x852), iPhone SE (375x667),
+Samsung Galaxy S23 (360x780), Google Pixel 8 (412x915).
+Tablets: iPad Pro 11" (834x1194), iPad Mini (744x1133), Galaxy Tab S9 (800x1280).
+Desktop: MacBook Pro 14" (1440x900), Monitor/iMac (1600x900),
+Janela do Navegador (1280x800).
+
+Cada moldura tem cor personalizável, com predefinições e seletor livre.
+
+## Limites
+
+- Só abre endereços públicos. Endereços internos (localhost, redes privadas,
+  link-local e metadados de nuvem) são recusados por segurança.
+- Não é indicado para acessar sistemas com dados sensíveis, porque o conteúdo
+  passa pelo servidor para poder ser exibido.
+
+## Páginas
+
+- [Início](${PUBLIC_URL}/): a ferramenta e a documentação de uso.
+- [Política de privacidade](${PUBLIC_URL}/privacidade): tratamento de dados,
+  cookies e publicidade.
+`);
+});
+
+app.get('/sitemap.xml', (_req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>${PUBLIC_URL}/</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>${PUBLIC_URL}/privacidade</loc><lastmod>${today}</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+</urlset>
+`);
+});
+
+// Exigido pelo AdSense para autorizar quem pode vender o inventário do domínio.
+app.get('/ads.txt', (_req, res) => {
+  if (!ADSENSE_CLIENT) return res.status(404).type('text/plain').send('');
+  const pub = ADSENSE_CLIENT.replace(/^ca-/, '');
+  res.type('text/plain').send(`google.com, ${pub}, DIRECT, f08c47fec0942fa0\n`);
+});
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
@@ -342,6 +462,6 @@ wss.on('connection', async (ws, req) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Device Mockup rodando em http://localhost:${PORT}`);
+  console.log(`mydevice rodando em http://localhost:${PORT}`);
   console.log(`Usando navegador: ${executablePath}`);
 });
