@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: device-mockup
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter        # o plano free tem pouca RAM para rodar o Chromium
+    healthCheckPath: /health
+    envVars:
+      - key: MAX_SESSIONS
+        value: "6"

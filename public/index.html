@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualizador de Dispositivos</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <h1>Visualizador de Dispositivos</h1>
+    </div>
+    <form id="url-form" class="url-form">
+      <input id="url-input" type="text" placeholder="digite.com/o-site-aqui" autocomplete="off" spellcheck="false">
+      <button type="submit" id="load-btn">Carregar</button>
+    </form>
+  </header>
+
+  <div id="error-banner" class="error-banner hidden"></div>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="category-tabs" id="category-tabs"></div>
+      <div class="model-list" id="model-list"></div>
+      <div class="sidebar-section-title">Cor da moldura</div>
+      <div class="color-list" id="color-list"></div>
+    </aside>
+
+    <section class="stage-wrap">
+      <div class="stage" id="stage">
+        <canvas id="preview-canvas" class="hidden"></canvas>
+        <div id="idle-placeholder" class="idle-placeholder">Digite uma URL e clique em Carregar</div>
+        <div id="live-frame" class="live-frame hidden"></div>
+        <div class="spinner hidden" id="spinner"><div class="spinner-ring"></div></div>
+      </div>
+
+      <div class="toolbar">
+        <div class="current-model" id="current-model-label">—</div>
+        <button id="download-btn" class="download-btn" disabled>
+          Baixar moldura <span class="sub">(PNG transparente)</span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
