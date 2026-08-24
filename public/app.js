@@ -589,9 +589,12 @@ async function startStaticSession() {
       const data = await resp.json().catch(() => ({}));
       // Sem `error` no corpo, a função caiu antes de tratar o pedido — o
       // status e o código ajudam a distinguir isso de uma falha do site alvo.
+      // O `detail` traz a mensagem crua do servidor — é o que permite
+      // identificar a causa sem acesso aos logs da plataforma.
       throw new Error(
         data.error
-          ? (data.code ? `${data.error} [${data.code}]` : data.error)
+          ? [data.error, data.code && `[${data.code}]`, data.detail && `— ${data.detail}`]
+              .filter(Boolean).join(' ')
           : `Falha ao carregar o site (resposta ${resp.status} do servidor de captura).`
       );
     }

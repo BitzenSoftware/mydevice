@@ -7,7 +7,7 @@
     "api/screenshot.js": {
       "memory": 1536,
       "maxDuration": 60,
-      "includeFiles": "node_modules/@sparticuz/chromium/**"
+      "includeFiles": "{lib,node_modules/@sparticuz/chromium}/**"
     }
   },
   "headers": [
