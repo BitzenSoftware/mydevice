@@ -129,7 +129,7 @@ const state = {
   liveOuter: null, // { w, h } do frame ao vivo atual, pra reposicionar no resize
   pendingCapture: null, // { resolve, reject } de uma captura de download em andamento
   screenEl: null,  // canvas da tela, preservado entre trocas de cor pra não reiniciar a sessão
-  actualSize: false, // true = moldura em tamanho real (1:1), com rolagem no palco
+  actualSize: true, // moldura em tamanho real (1:1): encolher pra caber borra o conteudo
   standalone: false, // true = abre como app instalado (display-mode: standalone)
   colorByModel: {},  // modelId -> id do preset escolhido
   customByModel: {}, // modelId -> cor personalizada (hex)
@@ -518,9 +518,13 @@ function layoutLiveFrame(outerW, outerH) {
   const stage = document.getElementById('stage');
   const availW = Math.max(stage.clientWidth - 20, 100);
   const availH = Math.max(stage.clientHeight - 20, 100);
-  // Reduzir a moldura pra caber na janela encolhe junto o conteúdo do site,
-  // que é o que fazia o texto parecer borrado. Em 100% o palco rola.
-  const scale = state.actualSize ? 1 : Math.min(availW / outerW, availH / outerH);
+  // Reduzir a moldura pra caber na janela encolhe junto o conteúdo do site, e
+  // é isso que deixa o texto pequeno demais pra avaliar. Então o padrão escala
+  // por moldura: mantém 1:1 sempre que couber na LARGURA (celular e tablet
+  // cabem), rolando na vertical; só reduz o necessário quando a moldura é mais
+  // larga que o palco (desktop), porque rolagem horizontal é pior que reduzir.
+  const fit = Math.min(availW / outerW, availH / outerH);
+  const scale = state.actualSize ? Math.min(1, availW / outerW) : fit;
   sizer.style.width = (outerW * scale) + 'px';
   sizer.style.height = (outerH * scale) + 'px';
   frameEl.style.transform = `scale(${scale})`;
@@ -1064,7 +1068,7 @@ els.standaloneToggle.addEventListener('change', () => {
 
 els.zoomBtn.addEventListener('click', () => {
   state.actualSize = !state.actualSize;
-  els.zoomBtn.textContent = state.actualSize ? 'Ajustar à janela' : 'Ver em 100%';
+  els.zoomBtn.textContent = state.actualSize ? 'Ajustar à janela' : 'Tamanho real';
   els.zoomBtn.classList.toggle('active', state.actualSize);
   document.getElementById('stage').classList.toggle('actual-size', state.actualSize);
   if (state.liveOuter) layoutLiveFrame(state.liveOuter.w, state.liveOuter.h);
@@ -1078,4 +1082,10 @@ window.addEventListener('resize', () => {
 renderCategoryTabs();
 renderModelList();
 renderColorSwatches();
+// O padrao e 1:1. Encolher a moldura pra caber na janela reduz junto o
+// conteudo do site (numa janela baixa chega a 45%), e ai o texto fica
+// pequeno demais pra avaliar qualquer coisa.
+els.zoomBtn.textContent = 'Ajustar à janela';
+els.zoomBtn.classList.add('active');
+document.getElementById('stage').classList.add('actual-size');
 els.currentModelLabel.textContent = currentModel().name;

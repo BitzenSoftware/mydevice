@@ -50,6 +50,18 @@ if (!executablePath) {
 }
 
 let browserPromise = null;
+
+// Descarta o navegador em cache pra que a próxima sessão suba um novo. Sem
+// isto, um Chrome que morre ou trava derruba TODAS as sessões seguintes: o
+// promise fica cacheado e o servidor só volta a funcionar reiniciando.
+function dropBrowser(motivo) {
+  if (!browserPromise) return;
+  console.error(`[browser] descartado (${motivo}) — a próxima sessão sobe um novo`);
+  const dying = browserPromise;
+  browserPromise = null;
+  dying.then(b => b.close().catch(() => {})).catch(() => {});
+}
+
 function getBrowser() {
   if (!browserPromise) {
     browserPromise = puppeteerPromise.then(puppeteer => puppeteer.launch({
@@ -58,8 +70,48 @@ function getBrowser() {
       args: HARDENING_ARGS,
     }));
     browserPromise.catch(() => { browserPromise = null; });
+    // O Chrome pode cair sozinho (OOM no contêiner, crash). Quando isso
+    // acontece, o puppeteer emite 'disconnected' — é o gancho pra não seguir
+    // entregando um navegador morto.
+    browserPromise.then(b => b.on('disconnected', () => {
+      if (browserPromise) { browserPromise = null; console.error('[browser] desconectado'); }
+    })).catch(() => {});
   }
   return browserPromise;
+}
+
+// Abre uma aba já lidando com o caso do navegador ruim. A primeira tentativa
+// depois de um crash costuma pegar um Chrome que subiu no meio da limpeza do
+// anterior e não responde; descartar e repetir uma vez resolve sozinho, sem o
+// visitante ver erro nenhum.
+async function openPage(label) {
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    try {
+      const browser = await withTimeout(getBrowser(), 'abrir navegador', BROWSER_LAUNCH_TIMEOUT_MS);
+      return await withTimeout(browser.newPage(), 'abrir aba');
+    } catch (err) {
+      dropBrowser(`${label}: ${err.message}`);
+      if (tentativa === 2) throw err;
+      console.log('[browser] nova tentativa apos falha');
+    }
+  }
+}
+
+// Um Chrome sobrecarregado para de responder sem desconectar: os awaits ficam
+// pendurados pra sempre e o cliente vê só o spinner girando. O prazo aqui
+// transforma isso num erro visível e força a troca do navegador.
+const BROWSER_OP_TIMEOUT_MS = 15000;
+// Subir o Chrome do zero é bem mais lento que as demais operações, ainda mais
+// num contêiner apertado ou numa máquina carregada, então tem prazo próprio.
+const BROWSER_LAUNCH_TIMEOUT_MS = 45000;
+function withTimeout(promise, label, ms = BROWSER_OP_TIMEOUT_MS) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`tempo esgotado: ${label}`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 // ---------- Páginas, SEO e leitura por IA ----------
@@ -120,8 +172,7 @@ app.get('/api/screenshot', async (req, res) => {
 
   let page;
   try {
-    const browser = await getBrowser();
-    page = await browser.newPage();
+    page = await openPage('captura');
     await page.setViewport({ width: w, height: h, deviceScaleFactor: scale, isMobile, hasTouch: isMobile });
     const shotClient = await page.createCDPSession();
     await applyDeviceProfile(shotClient, profile);
@@ -132,7 +183,10 @@ app.get('/api/screenshot', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.send(buffer);
   } catch (err) {
-    const timedOut = /timeout/i.test(err.message || '');
+    const timedOut = /timeout|tempo esgotado/i.test(err.message || '');
+    if (/tempo esgotado|Target closed|Session closed|Connection closed|Protocol error/i.test(err.message || '')) {
+      dropBrowser(err.message);
+    }
     res.status(502).json({
       error: timedOut
         ? 'O site demorou demais para responder.'
@@ -192,6 +246,7 @@ wss.on('connection', async (ws, req) => {
   }
 
   if (activeSessions >= MAX_SESSIONS) {
+    console.log(`[sessao] RECUSADA - teto de ${MAX_SESSIONS} atingido`);
     ws.send(JSON.stringify({ t: 'error', message: 'O servidor está com todas as sessões ocupadas. Tente de novo em instantes.' }));
     ws.close();
     return;
@@ -282,13 +337,12 @@ wss.on('connection', async (ws, req) => {
   };
 
   try {
-    const browser = await getBrowser();
-    page = await browser.newPage();
-    await page.setViewport({ width, height, deviceScaleFactor: dpr, isMobile: mobile, hasTouch: mobile });
+    page = await openPage('sessao ao vivo');
+    await withTimeout(page.setViewport({ width, height, deviceScaleFactor: dpr, isMobile: mobile, hasTouch: mobile }), 'viewport');
 
-    client = await page.createCDPSession();
-    await applyDeviceProfile(client, profile);
-    if (standalone) await emulateStandalone(page);
+    client = await withTimeout(page.createCDPSession(), 'sessao CDP');
+    await withTimeout(applyDeviceProfile(client, profile), 'perfil do aparelho');
+    if (standalone) await withTimeout(emulateStandalone(page), 'modo app instalado');
 
     client.on('Page.screencastFrame', async ({ data, sessionId }) => {
       sendFrame(FRAME_LIVE, Buffer.from(data, 'base64'));
@@ -319,8 +373,13 @@ wss.on('connection', async (ws, req) => {
       });
   } catch (err) {
     console.error('Erro ao iniciar sessão remota:', err.message);
+    // Travou ou o navegador morreu: joga fora o Chrome pra que a próxima
+    // tentativa suba um limpo, em vez de repetir a falha pra sempre.
+    if (/tempo esgotado|Target closed|Session closed|Connection closed|Protocol error/i.test(err.message || '')) {
+      dropBrowser(err.message);
+    }
     if (ws.readyState === ws.OPEN) {
-      ws.send(JSON.stringify({ t: 'error', message: 'Não foi possível iniciar a sessão.' }));
+      ws.send(JSON.stringify({ t: 'error', message: 'Não foi possível iniciar a sessão. Tente carregar de novo.' }));
     }
     await cleanup();
     return;
