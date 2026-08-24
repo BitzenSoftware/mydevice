@@ -205,11 +205,17 @@ html, body {
   height: 100%;
   max-height: calc(100vh - 130px);
 }
-/* Em 100% a moldura sai em tamanho real e o palco passa a rolar. */
-.stage.actual-size {
-  overflow: auto;
+/* Em tamanho real a moldura costuma ser mais alta que a janela. Rolar dentro
+   de um palco de altura fixa cortava o aparelho e escondia a moldura, então o
+   palco cresce junto com o conteúdo e quem rola é a página inteira. */
+body.actual-size .layout { height: auto; }
+body.actual-size .sidebar { position: sticky; top: 0; align-self: flex-start; max-height: 100vh; }
+body.actual-size .stage-wrap { justify-content: flex-start; }
+body.actual-size .stage {
+  max-height: none;
+  height: auto;
+  overflow: visible;
   align-items: flex-start;
-  justify-content: flex-start;
 }
 
 .toggle-row {

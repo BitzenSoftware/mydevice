@@ -517,7 +517,8 @@ function layoutLiveFrame(outerW, outerH) {
   if (!sizer || !frameEl) return;
   const stage = document.getElementById('stage');
   const availW = Math.max(stage.clientWidth - 20, 100);
-  const availH = Math.max(stage.clientHeight - 20, 100);
+  // Em tamanho real a altura não limita: a página rola.
+  const availH = Math.max((state.actualSize ? window.innerHeight : stage.clientHeight) - 20, 100);
   // Reduzir a moldura pra caber na janela encolhe junto o conteúdo do site, e
   // é isso que deixa o texto pequeno demais pra avaliar. Então o padrão escala
   // por moldura: mantém 1:1 sempre que couber na LARGURA (celular e tablet
@@ -528,6 +529,15 @@ function layoutLiveFrame(outerW, outerH) {
   sizer.style.width = (outerW * scale) + 'px';
   sizer.style.height = (outerH * scale) + 'px';
   frameEl.style.transform = `scale(${scale})`;
+
+  // Mostrar a escala em vigor evita o engano de estar vendo o site reduzido
+  // sem perceber — reduzido, o texto do site encolhe junto e parece borrado.
+  const pct = Math.round(scale * 100);
+  els.zoomBtn.textContent = `Zoom ${pct}%`;
+  els.zoomBtn.classList.toggle('active', pct === 100);
+  els.zoomBtn.title = state.actualSize
+    ? 'Tamanho real. Clique para encolher a moldura até caber na janela.'
+    : 'Reduzido para caber na janela — o conteúdo do site encolhe junto. Clique para ver em tamanho real.';
 }
 
 function closeSession() {
@@ -1068,9 +1078,7 @@ els.standaloneToggle.addEventListener('change', () => {
 
 els.zoomBtn.addEventListener('click', () => {
   state.actualSize = !state.actualSize;
-  els.zoomBtn.textContent = state.actualSize ? 'Ajustar à janela' : 'Tamanho real';
-  els.zoomBtn.classList.toggle('active', state.actualSize);
-  document.getElementById('stage').classList.toggle('actual-size', state.actualSize);
+  document.body.classList.toggle('actual-size', state.actualSize);
   if (state.liveOuter) layoutLiveFrame(state.liveOuter.w, state.liveOuter.h);
 });
 
@@ -1085,7 +1093,7 @@ renderColorSwatches();
 // O padrao e 1:1. Encolher a moldura pra caber na janela reduz junto o
 // conteudo do site (numa janela baixa chega a 45%), e ai o texto fica
 // pequeno demais pra avaliar qualquer coisa.
-els.zoomBtn.textContent = 'Ajustar à janela';
+els.zoomBtn.textContent = 'Zoom 100%';
 els.zoomBtn.classList.add('active');
-document.getElementById('stage').classList.add('actual-size');
+document.body.classList.add('actual-size');
 els.currentModelLabel.textContent = currentModel().name;
