@@ -528,6 +528,8 @@ function layoutLiveFrame(outerW, outerH) {
 
 function closeSession() {
   if (state.ws) {
+    // Marca antes de fechar pra que o onclose não trate isto como queda.
+    state.ws.intentionalClose = true;
     try { state.ws.close(); } catch {}
     state.ws = null;
   }
@@ -727,6 +729,15 @@ function startRemoteSession() {
       els.spinner.classList.add('hidden');
       showError('Erro de conexão com a sessão remota.');
     }
+  };
+
+  // Sem isto, uma sessão que morre (servidor reiniciado, aba dormindo, rede
+  // caindo) deixava o spinner girando pra sempre: o onerror acima não dispara
+  // quando o socket só fecha.
+  ws.onclose = () => {
+    if (gen !== state.sessionGen || ws.intentionalClose) return;
+    els.spinner.classList.add('hidden');
+    showError('A sessão foi encerrada. Clique em Carregar para abrir de novo.');
   };
 }
 
