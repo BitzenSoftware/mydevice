@@ -22,6 +22,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY server.js ./
+COPY lib ./lib
 COPY public ./public
 
 # O Chrome não deve rodar como root; a imagem do node já traz o usuário "node".
