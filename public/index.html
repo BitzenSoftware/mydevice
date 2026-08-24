@@ -4,19 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>mydevice — Veja seu site em molduras de celular, tablet e desktop</title>
-<meta name="description" content="Digite a URL e navegue pelo seu site dentro de molduras realistas de iPhone, Android, iPad e desktop. Emulação de verdade: o site reconhece que está num celular. Baixe o mockup em PNG com fundo transparente.">
+{{IF_LIVE}}<meta name="description" content="Digite a URL e navegue pelo seu site dentro de molduras realistas de iPhone, Android, iPad e desktop. Emulação de verdade: o site reconhece que está num celular. Baixe o mockup em PNG com fundo transparente.">{{/IF_LIVE}}{{IF_STATIC}}<meta name="description" content="Digite a URL e veja seu site em molduras realistas de iPhone, Android, iPad e desktop. Emulação de verdade: o site reconhece que está num celular. Baixe o mockup em PNG com fundo transparente.">{{/IF_STATIC}}
 <link rel="canonical" href="{{CANONICAL}}/">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="mydevice">
 <meta property="og:title" content="mydevice — Veja seu site em molduras de celular, tablet e desktop">
-<meta property="og:description" content="Navegue pelo seu site dentro de molduras realistas de aparelhos e baixe o mockup em PNG transparente.">
+{{IF_LIVE}}<meta property="og:description" content="Navegue pelo seu site dentro de molduras realistas de aparelhos e baixe o mockup em PNG transparente.">{{/IF_LIVE}}{{IF_STATIC}}<meta property="og:description" content="Veja seu site em molduras realistas de aparelhos e baixe o mockup em PNG transparente.">{{/IF_STATIC}}
 <meta property="og:url" content="{{CANONICAL}}/">
 <meta property="og:locale" content="pt_BR">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="mydevice — Veja seu site em molduras de dispositivo">
-<meta name="twitter:description" content="Navegue pelo seu site dentro de molduras realistas de aparelhos e baixe o mockup em PNG transparente.">
+{{IF_LIVE}}<meta name="twitter:description" content="Navegue pelo seu site dentro de molduras realistas de aparelhos e baixe o mockup em PNG transparente.">{{/IF_LIVE}}{{IF_STATIC}}<meta name="twitter:description" content="Veja seu site em molduras realistas de aparelhos e baixe o mockup em PNG transparente.">{{/IF_STATIC}}
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='9' y='2' width='14' height='28' rx='4' fill='%236c8dff'/%3E%3Crect x='11' y='6' width='10' height='20' rx='1' fill='%230f1115'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
@@ -32,9 +32,9 @@
       "applicationCategory": "DesignApplication",
       "operatingSystem": "Web",
       "inLanguage": "pt-BR",
-      "description": "Ferramenta web que abre qualquer site dentro de molduras realistas de celular, tablet e desktop, com navegação ao vivo, emulação real de dispositivo móvel e download do mockup em PNG com fundo transparente.",
+      "description": {{IF_LIVE}}"Ferramenta web que abre qualquer site dentro de molduras realistas de celular, tablet e desktop, com navegação ao vivo, emulação real de dispositivo móvel e download do mockup em PNG com fundo transparente."{{/IF_LIVE}}{{IF_STATIC}}"Ferramenta web que abre qualquer site dentro de molduras realistas de celular, tablet e desktop, com emulação real de dispositivo móvel e download do mockup em PNG com fundo transparente."{{/IF_STATIC}},
       "featureList": [
-        "Navegação ao vivo dentro da moldura",
+        {{IF_LIVE}}"Navegação ao vivo dentro da moldura",{{/IF_LIVE}}
         "Emulação real de dispositivo móvel (user-agent, toque e viewport)",
         "10 modelos de aparelho entre celulares, tablets e desktop",
         "Cores de moldura personalizáveis",
@@ -48,7 +48,7 @@
         {
           "@type": "Question",
           "name": "O site dentro da moldura é navegável ou é só uma imagem?",
-          "acceptedAnswer": { "@type": "Answer", "text": "É navegável. O site roda de verdade num navegador no servidor e a tela é transmitida ao vivo, então você clica em botões, rola a página, preenche formulários e troca de tela normalmente." }
+          "acceptedAnswer": { "@type": "Answer", "text": {{IF_LIVE}}"É navegável. O site roda de verdade num navegador no servidor e a tela é transmitida ao vivo, então você clica em botões, rola a página, preenche formulários e troca de tela normalmente."{{/IF_LIVE}}{{IF_STATIC}}"Nesta instalação a tela é uma captura estática da página inicial do endereço informado. Você escolhe o aparelho, troca a cor da moldura e baixa a imagem, mas não clica nem rola dentro da tela."{{/IF_STATIC}} }
         },
         {
           "@type": "Question",
@@ -76,6 +76,7 @@
 }
 </script>
 {{ADSENSE_HEAD}}
+{{RUNTIME_CONFIG}}
 </head>
 <body>
   <header class="topbar">
@@ -120,20 +121,24 @@
   <article class="content">
     <h1>mydevice: veja seu site rodando dentro de um celular de verdade</h1>
     <p class="lead">
-      O <strong>mydevice</strong> abre qualquer site dentro de uma moldura realista de celular,
+      {{IF_LIVE}}O <strong>mydevice</strong> abre qualquer site dentro de uma moldura realista de celular,
       tablet ou computador — e o site continua funcionando. Você clica nos botões, rola a página,
       aceita o aviso de cookies, entra no menu e navega entre telas, tudo dentro do aparelho.
       Quando a tela estiver do jeito que você quer, um botão baixa o mockup pronto em PNG com
-      fundo transparente.
+      fundo transparente.{{/IF_LIVE}}{{IF_STATIC}}O <strong>mydevice</strong> abre qualquer site dentro de uma moldura realista de celular,
+      tablet ou computador, usando a emulação de verdade do aparelho — o mesmo user-agent, o
+      mesmo viewport e o mesmo suporte a toque que o site receberia de um celular físico, e não
+      um desenho por cima de um print. Escolha o aparelho e a cor da moldura e baixe o mockup
+      pronto em PNG com fundo transparente.{{/IF_STATIC}}
     </p>
 
     {{AD_SLOT_1}}
 
-    <h2 id="como-usar">Como usar em quatro passos</h2>
+    <h2 id="como-usar">Como usar em {{IF_LIVE}}quatro{{/IF_LIVE}}{{IF_STATIC}}três{{/IF_STATIC}} passos</h2>
     <ol class="steps">
       <li><strong>Cole o endereço</strong> do site no campo lá em cima e clique em Carregar.</li>
       <li><strong>Escolha o aparelho</strong> na lateral, entre celulares, tablets e telas de desktop.</li>
-      <li><strong>Navegue até a tela</strong> que você quer mostrar, clicando e rolando dentro da moldura.</li>
+      {{IF_LIVE}}<li><strong>Navegue até a tela</strong> que você quer mostrar, clicando e rolando dentro da moldura.</li>{{/IF_LIVE}}
       <li><strong>Escolha a cor</strong> da moldura e clique em Baixar moldura.</li>
     </ol>
 
@@ -211,9 +216,11 @@
     <h2 id="perguntas">Perguntas frequentes</h2>
     <div class="faq">
       <h3>O site dentro da moldura é navegável ou é só uma imagem?</h3>
-      <p>É navegável. O site roda de verdade num navegador no servidor e a tela é transmitida
+      {{IF_LIVE}}<p>É navegável. O site roda de verdade num navegador no servidor e a tela é transmitida
       ao vivo, então você clica em botões, rola a página, preenche formulários e troca de tela
-      normalmente.</p>
+      normalmente.</p>{{/IF_LIVE}}{{IF_STATIC}}<p>Nesta instalação a tela é uma captura estática da página inicial do endereço
+      informado. Você escolhe o aparelho, troca a cor da moldura e baixa a imagem, mas não
+      clica nem rola dentro da tela.</p>{{/IF_STATIC}}
 
       <h3>Meu site em PWA vai reconhecer que está num celular?</h3>
       <p>Sim. A página é aberta com emulação completa do aparelho escolhido: user-agent móvel,
@@ -235,9 +242,11 @@
       trava fica desligada e você consegue apontar para o seu ambiente local.</p>
 
       <h3>A imagem fica nítida mesmo em tela de alta densidade?</h3>
-      <p>Fica. Enquanto você interage, a transmissão prioriza a fluidez; assim que você para, a
+      {{IF_LIVE}}<p>Fica. Enquanto você interage, a transmissão prioriza a fluidez; assim que você para, a
       tela é reenviada na densidade de pixels real do aparelho — três vezes a resolução lógica
-      num iPhone 15 Pro, por exemplo. O download sempre usa a versão em alta resolução.</p>
+      num iPhone 15 Pro, por exemplo. O download sempre usa a versão em alta resolução.</p>{{/IF_LIVE}}{{IF_STATIC}}<p>Fica. A captura usa a densidade de pixels real do aparelho — três vezes a
+      resolução lógica num iPhone 15 Pro, por exemplo — e o download sai nessa mesma
+      resolução.</p>{{/IF_STATIC}}
     </div>
   </article>
 

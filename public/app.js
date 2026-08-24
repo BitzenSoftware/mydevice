@@ -231,7 +231,7 @@ function selectModel(id) {
   els.currentModelLabel.textContent = currentModel().name;
   renderModelList();
   renderColorSwatches();
-  if (state.url) startRemoteSession();
+  if (state.url) startSession();
 }
 
 // ---------- Erro ----------
@@ -551,6 +551,63 @@ function rebuildFrame() {
   layoutLiveFrame(built.outerW, built.outerH);
 }
 
+// ---------- Modo de captura estática ----------
+// Onde não há motor de navegação ao vivo (hospedagem serverless, por exemplo),
+// o site é capturado uma vez e exibido parado dentro da moldura. Sem clique e
+// sem rolagem — mas escolher aparelho, trocar a cor e baixar o PNG continuam
+// funcionando igual.
+const LIVE_ENGINE = (window.__MYDEVICE__ || {}).liveEngine;
+const LIVE_AVAILABLE = LIVE_ENGINE !== null && LIVE_ENGINE !== undefined;
+
+function screenshotUrl(m) {
+  const mobile = m.category === 'phone' || m.category === 'tablet';
+  const params = new URLSearchParams({
+    url: state.url, width: m.viewport.w, height: m.viewport.h, dpr: m.dpr, mobile: mobile ? '1' : '0',
+  });
+  return '/api/screenshot?' + params.toString();
+}
+
+async function startStaticSession() {
+  closeSession();
+  const gen = ++state.sessionGen;
+  const m = currentModel();
+
+  els.idlePlaceholder.classList.add('hidden');
+  els.liveFrame.classList.remove('hidden');
+  els.spinner.classList.remove('hidden');
+  els.downloadBtn.disabled = true;
+  clearError();
+
+  const screenEl = buildRemoteScreen(m.viewport.w, m.viewport.h, m.dpr);
+  state.screenEl = screenEl;
+  rebuildFrame();
+  els.currentModelLabel.textContent = m.name;
+
+  try {
+    const resp = await fetch(screenshotUrl(m));
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      throw new Error(data.error || 'Falha ao carregar o site.');
+    }
+    const bitmap = await createImageBitmap(await resp.blob());
+    if (gen !== state.sessionGen) return;
+    screenEl.width = bitmap.width;
+    screenEl.height = bitmap.height;
+    screenEl.getContext('2d').drawImage(bitmap, 0, 0);
+    bitmap.close();
+    state.staticShot = true;
+    els.downloadBtn.disabled = false;
+  } catch (err) {
+    if (gen === state.sessionGen) showError(err.message);
+  } finally {
+    if (gen === state.sessionGen) els.spinner.classList.add('hidden');
+  }
+}
+
+function startSession() {
+  return LIVE_AVAILABLE ? startRemoteSession() : startStaticSession();
+}
+
 function startRemoteSession() {
   closeSession();
   const gen = ++state.sessionGen;
@@ -574,7 +631,12 @@ function startRemoteSession() {
   const params = new URLSearchParams({
     url: state.url, width: m.viewport.w, height: m.viewport.h, dpr: m.dpr, mobile: mobile ? '1' : '0',
   });
-  const ws = new WebSocket(`${proto}://${location.host}/ws/session?${params.toString()}`);
+  // LIVE_ENGINE vazio significa "mesmo servidor que entregou a página"; quando
+  // preenchido, o motor de navegação está hospedado em outro endereço.
+  const base = LIVE_ENGINE
+    ? LIVE_ENGINE.replace(/^http/, 'ws').replace(/\/+$/, '')
+    : `${proto}://${location.host}`;
+  const ws = new WebSocket(`${base}/ws/session?${params.toString()}`);
   ws.binaryType = 'arraybuffer';
   state.ws = ws;
 
@@ -677,11 +739,22 @@ async function downloadFrame() {
   els.downloadBtn.disabled = true;
   els.downloadBtn.textContent = 'Gerando imagem...';
   try {
-    // captura exatamente o que está sendo exibido AGORA na sessão ao vivo
-    // (inclusive telas pra onde o usuário navegou), não a página recarregada do zero.
-    const pngBlob = await requestCapture();
-    const img = await createImageBitmap(pngBlob);
     const m = currentModel();
+    // Com motor ao vivo, captura exatamente o que está sendo exibido AGORA
+    // (inclusive telas pra onde o usuário navegou). No modo estático, pede
+    // uma captura nova da URL.
+    let pngBlob;
+    if (LIVE_AVAILABLE) {
+      pngBlob = await requestCapture();
+    } else {
+      const resp = await fetch(screenshotUrl(m));
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        throw new Error(data.error || 'Falha ao gerar a captura para download.');
+      }
+      pngBlob = await resp.blob();
+    }
+    const img = await createImageBitmap(pngBlob);
     drawDownloadCanvas(m, img);
 
     els.canvas.toBlob(pngBlob => {
@@ -950,7 +1023,7 @@ els.form.addEventListener('submit', e => {
   }
   state.url = normalized;
   els.urlInput.value = normalized;
-  startRemoteSession();
+  startSession();
 });
 
 els.downloadBtn.addEventListener('click', downloadFrame);

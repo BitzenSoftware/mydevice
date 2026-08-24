@@ -4,7 +4,8 @@ const { WebSocketServer } = require('ws');
 const puppeteer = require('puppeteer-core');
 const fs = require('fs');
 const path = require('path');
-const dns = require('dns').promises;
+const { assertPublicUrl, HARDENING_ARGS } = require('./lib/safe-url');
+const site = require('./lib/site-content');
 
 const app = express();
 const PORT = process.env.PORT || 5177;
@@ -54,12 +55,7 @@ function getBrowser() {
     browserPromise = puppeteer.launch({
       executablePath,
       headless: true,
-      args: [
-        '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-        // Fecha o endereço de metadados da nuvem no próprio resolvedor do
-        // navegador, para que nem um redirecionamento consiga alcançá-lo.
-        '--host-resolver-rules=MAP 169.254.169.254 0.0.0.0,MAP metadata.google.internal 0.0.0.0',
-      ],
+      args: HARDENING_ARGS,
     });
     browserPromise.catch(() => { browserPromise = null; });
   }
@@ -68,177 +64,84 @@ function getBrowser() {
 
 // ---------- Páginas, SEO e leitura por IA ----------
 // O conteúdo do site fica em HTML de verdade, sem depender de JavaScript, para
-// que buscadores e rastreadores de IA consigam ler. As páginas passam por uma
-// substituição simples de marcadores (domínio canônico e blocos de anúncio).
-const ADSENSE_CLIENT = (process.env.ADSENSE_CLIENT || '').trim(); // ex.: ca-pub-0000000000000000
+// que buscadores e rastreadores de IA consigam ler. A geração é compartilhada
+// com a build estática da Vercel (lib/site-content.js), para as duas hospedagens
+// produzirem exatamente as mesmas páginas.
 const PUBLIC_URL = (process.env.PUBLIC_URL || `http://localhost:${PORT}`).replace(/\/+$/, '');
+const ADSENSE_CLIENT = (process.env.ADSENSE_CLIENT || '').trim();
 
-const ADSENSE_HEAD = ADSENSE_CLIENT
-  ? `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}" crossorigin="anonymous"></script>`
-  : '';
-
-// Sem ADSENSE_CLIENT configurado o bloco sai vazio (o CSS esconde slots vazios),
-// então nada de espaço reservado sobrando enquanto a conta não está aprovada.
-const adSlot = slot => ADSENSE_CLIENT
-  ? `<div class="ad-slot"><ins class="adsbygoogle" style="display:block" data-ad-client="${ADSENSE_CLIENT}" data-ad-slot="${slot}" data-ad-format="auto" data-full-width-responsive="true"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div>`
-  : '';
-
-function renderPage(file) {
-  const html = fs.readFileSync(path.join(__dirname, 'public', file), 'utf8');
-  return html
-    .replace(/\{\{CANONICAL\}\}/g, PUBLIC_URL)
-    .replace(/\{\{ADSENSE_HEAD\}\}/g, ADSENSE_HEAD)
-    .replace(/\{\{AD_SLOT_1\}\}/g, adSlot(process.env.ADSENSE_SLOT_1 || ''))
-    .replace(/\{\{AD_SLOT_2\}\}/g, adSlot(process.env.ADSENSE_SLOT_2 || ''));
-}
-
-const sendPage = (res, file) => {
-  res.type('html').send(renderPage(file));
+const pageOpts = {
+  publicUrl: PUBLIC_URL,
+  adsenseClient: ADSENSE_CLIENT,
+  slot1: process.env.ADSENSE_SLOT_1 || '',
+  slot2: process.env.ADSENSE_SLOT_2 || '',
+  liveEngine: '', // mesmo servidor: aqui a navegação ao vivo está disponível
 };
 
-app.get('/', (_req, res) => sendPage(res, 'index.html'));
-app.get('/privacidade', (_req, res) => sendPage(res, 'privacidade.html'));
+app.get('/', (_req, res) => res.type('html').send(site.renderPage('index.html', pageOpts)));
+app.get('/privacidade', (_req, res) => res.type('html').send(site.renderPage('privacidade.html', pageOpts)));
 
 // index: false para que a rota acima trate a home em vez do arquivo cru
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
-// Rastreadores de IA são liberados explicitamente: a proposta é que o conteúdo
-// seja legível por assistentes, não só por buscadores tradicionais.
-app.get('/robots.txt', (_req, res) => {
-  const aiBots = [
-    'GPTBot', 'OAI-SearchBot', 'ChatGPT-User',
-    'ClaudeBot', 'Claude-Web', 'anthropic-ai',
-    'PerplexityBot', 'Perplexity-User',
-    'Google-Extended', 'Applebot', 'Applebot-Extended',
-    'CCBot', 'Amazonbot', 'Bytespider', 'meta-externalagent', 'cohere-ai',
-    'DuckAssistBot', 'MistralAI-User', 'YouBot', 'Diffbot', 'Timpibot',
-  ];
-  res.type('text/plain').send(
-    [
-      '# mydevice — leitura liberada para buscadores e assistentes de IA',
-      ...aiBots.flatMap(bot => [`User-agent: ${bot}`, 'Allow: /', '']),
-      'User-agent: *',
-      'Allow: /',
-      'Disallow: /ws/',
-      'Disallow: /health',
-      '',
-      `Sitemap: ${PUBLIC_URL}/sitemap.xml`,
-      '',
-    ].join('\n')
-  );
-});
-
-// Resumo legível por máquina, no formato llms.txt.
-app.get('/llms.txt', (_req, res) => {
-  res.type('text/plain').send(`# mydevice
-
-> Ferramenta web gratuita que abre qualquer site dentro de molduras realistas de
-> celular, tablet e desktop. O site continua navegável dentro da moldura e o
-> mockup pode ser baixado em PNG com fundo transparente.
-
-## O que a ferramenta faz
-
-- Abre uma URL pública dentro da moldura do aparelho escolhido.
-- O site é navegável: aceita cliques, rolagem, digitação e troca de telas.
-- Emula o aparelho de verdade (user-agent móvel, eventos de toque e viewport),
-  então PWAs e sites responsivos entregam o layout móvel correto.
-- Funciona com sites que bloqueiam incorporação via iframe, porque a página é
-  aberta num navegador no servidor e não embutida no navegador do visitante.
-- Exporta o resultado em PNG com fundo transparente, contendo apenas o aparelho.
-
-## Aparelhos disponíveis
-
-Celulares: iPhone 15 Pro (393x852), iPhone SE (375x667),
-Samsung Galaxy S23 (360x780), Google Pixel 8 (412x915).
-Tablets: iPad Pro 11" (834x1194), iPad Mini (744x1133), Galaxy Tab S9 (800x1280).
-Desktop: MacBook Pro 14" (1440x900), Monitor/iMac (1600x900),
-Janela do Navegador (1280x800).
-
-Cada moldura tem cor personalizável, com predefinições e seletor livre.
-
-## Limites
-
-- Só abre endereços públicos. Endereços internos (localhost, redes privadas,
-  link-local e metadados de nuvem) são recusados por segurança.
-- Não é indicado para acessar sistemas com dados sensíveis, porque o conteúdo
-  passa pelo servidor para poder ser exibido.
-
-## Páginas
-
-- [Início](${PUBLIC_URL}/): a ferramenta e a documentação de uso.
-- [Política de privacidade](${PUBLIC_URL}/privacidade): tratamento de dados,
-  cookies e publicidade.
-`);
-});
-
-app.get('/sitemap.xml', (_req, res) => {
-  const today = new Date().toISOString().slice(0, 10);
-  res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>${PUBLIC_URL}/</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>${PUBLIC_URL}/privacidade</loc><lastmod>${today}</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
-</urlset>
-`);
-});
-
-// Exigido pelo AdSense para autorizar quem pode vender o inventário do domínio.
+app.get('/robots.txt', (_req, res) => res.type('text/plain').send(site.robotsTxt(PUBLIC_URL)));
+app.get('/llms.txt', (_req, res) => res.type('text/plain').send(site.llmsTxt(PUBLIC_URL)));
+app.get('/sitemap.xml', (_req, res) => res.type('application/xml').send(site.sitemapXml(PUBLIC_URL)));
 app.get('/ads.txt', (_req, res) => {
-  if (!ADSENSE_CLIENT) return res.status(404).type('text/plain').send('');
-  const pub = ADSENSE_CLIENT.replace(/^ca-/, '');
-  res.type('text/plain').send(`google.com, ${pub}, DIRECT, f08c47fec0942fa0\n`);
+  const body = site.adsTxt(ADSENSE_CLIENT);
+  return body ? res.type('text/plain').send(body) : res.status(404).type('text/plain').send('');
+});
+
+
+// Mesmo endpoint da função serverless (api/screenshot.js), para que os dois
+// ambientes se comportem igual e o modo de captura estática possa ser testado
+// aqui também.
+app.get('/api/screenshot', async (req, res) => {
+  const rawUrl = req.query.url;
+  const w = Math.round(Number(req.query.width));
+  const h = Math.round(Number(req.query.height));
+  const scale = Math.min(Number(req.query.dpr) || 2, 3);
+  const isMobile = req.query.mobile === '1';
+
+  if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) {
+    return res.status(400).json({ error: 'URL inválida. Use http:// ou https://' });
+  }
+  if (!w || !h || w < 100 || h < 100 || w > 3000 || h > 3000) {
+    return res.status(400).json({ error: 'Dimensões de viewport inválidas.' });
+  }
+
+  try {
+    await assertPublicUrl(rawUrl);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  let page;
+  try {
+    const browser = await getBrowser();
+    page = await browser.newPage();
+    await page.setViewport({ width: w, height: h, deviceScaleFactor: scale, isMobile, hasTouch: isMobile });
+    await page.setUserAgent(isMobile ? MOBILE_UA : DESKTOP_UA);
+    await page.goto(rawUrl, { waitUntil: 'networkidle2', timeout: 20000 });
+    const buffer = await page.screenshot({ type: 'png' });
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(buffer);
+  } catch (err) {
+    const timedOut = /timeout/i.test(err.message || '');
+    res.status(502).json({
+      error: timedOut
+        ? 'O site demorou demais para responder.'
+        : 'Não foi possível carregar essa URL (o site pode bloquear acesso automatizado ou não existir).',
+    });
+  } finally {
+    if (page) await page.close().catch(() => {});
+  }
 });
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 const server = http.createServer(app);
-
-// ---------- Proteção contra alvos internos (SSRF) ----------
-// O servidor abre qualquer URL que o visitante digitar. Publicamente exposto,
-// isso permitiria usá-lo para alcançar coisas que só a máquina enxerga: o
-// serviço rodando em localhost, a rede privada do provedor ou o endpoint de
-// metadados da nuvem (que costuma entregar credenciais). Então resolvemos o
-// nome antes e recusamos se apontar para um endereço não público.
-function isBlockedIPv4(ip) {
-  const p = ip.split('.').map(Number);
-  if (p.length !== 4 || p.some(n => Number.isNaN(n))) return true;
-  const [a, b] = p;
-  if (a === 0 || a === 127 || a === 10) return true;              // este host, loopback, privado
-  if (a === 172 && b >= 16 && b <= 31) return true;               // privado
-  if (a === 192 && b === 168) return true;                        // privado
-  if (a === 169 && b === 254) return true;                        // link-local / metadados
-  if (a === 100 && b >= 64 && b <= 127) return true;              // CGNAT
-  if (a >= 224) return true;                                      // multicast / reservado
-  return false;
-}
-
-function isBlockedIPv6(ip) {
-  const v = ip.toLowerCase().split('%')[0];
-  if (v === '::' || v === '::1') return true;                     // indefinido / loopback
-  if (v.startsWith('fc') || v.startsWith('fd')) return true;      // único local
-  if (v.startsWith('fe8') || v.startsWith('fe9') ||
-      v.startsWith('fea') || v.startsWith('feb')) return true;    // link-local
-  const mapped = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);        // IPv4 embutido
-  if (mapped) return isBlockedIPv4(mapped[1]);
-  return false;
-}
-
-// Rodando na sua máquina, apontar para localhost é justamente um dos usos mais
-// úteis (ver o seu próprio projeto em desenvolvimento dentro de uma moldura),
-// então a trava só vale em produção. Dá para forçar com ALLOW_PRIVATE_HOSTS.
-const ALLOW_PRIVATE_HOSTS = process.env.ALLOW_PRIVATE_HOSTS
-  ? process.env.ALLOW_PRIVATE_HOSTS === '1'
-  : process.env.NODE_ENV !== 'production';
-
-async function assertPublicUrl(rawUrl) {
-  if (ALLOW_PRIVATE_HOSTS) return;
-  const parsed = new URL(rawUrl);
-  const addrs = await dns.lookup(parsed.hostname, { all: true });
-  if (!addrs.length) throw new Error('Não foi possível resolver esse endereço.');
-  for (const { address, family } of addrs) {
-    const blocked = family === 6 ? isBlockedIPv6(address) : isBlockedIPv4(address);
-    if (blocked) throw new Error('Esse endereço é interno e não pode ser aberto por aqui.');
-  }
-}
 
 // Cada sessão mantém uma aba de Chrome viva; sem teto, visitas simultâneas
 // esgotariam a memória do contêiner.
