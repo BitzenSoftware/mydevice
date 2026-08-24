@@ -587,7 +587,13 @@ async function startStaticSession() {
     const resp = await fetch(screenshotUrl(m));
     if (!resp.ok) {
       const data = await resp.json().catch(() => ({}));
-      throw new Error(data.error || 'Falha ao carregar o site.');
+      // Sem `error` no corpo, a função caiu antes de tratar o pedido — o
+      // status e o código ajudam a distinguir isso de uma falha do site alvo.
+      throw new Error(
+        data.error
+          ? (data.code ? `${data.error} [${data.code}]` : data.error)
+          : `Falha ao carregar o site (resposta ${resp.status} do servidor de captura).`
+      );
     }
     const bitmap = await createImageBitmap(await resp.blob());
     if (gen !== state.sessionGen) return;
