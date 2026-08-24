@@ -5,9 +5,9 @@
 // emulação do aparelho pedido, devolve um PNG e encerra. É o modo de captura
 // estática — a navegação ao vivo depende de um servidor de processo longo
 // (ver server.js e o Dockerfile).
-const puppeteer = require('puppeteer-core');
-const { assertPublicUrl, HARDENING_ARGS } = require('../lib/safe-url');
-
+// Nada de require pesado no escopo do módulo: se algo falhar ali, a invocação
+// morre antes de qualquer tratamento e o cliente recebe um 500 mudo, sem pista
+// nenhuma. Tudo é carregado dentro do handler, sob try/catch.
 const MOBILE_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36';
 const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
@@ -19,6 +19,23 @@ const fail = (res, status, code, message, detail) => {
 };
 
 module.exports = async (req, res) => {
+  try {
+    return await handle(req, res);
+  } catch (err) {
+    // Rede de segurança: qualquer coisa não prevista ainda vira JSON legível.
+    return fail(res, 500, 'handler-crash', 'Erro inesperado no servidor de captura.', err && err.message);
+  }
+};
+
+async function handle(req, res) {
+  let puppeteer, assertPublicUrl, HARDENING_ARGS;
+  try {
+    puppeteer = require('puppeteer-core');
+    ({ assertPublicUrl, HARDENING_ARGS } = require('../lib/safe-url'));
+  } catch (err) {
+    return fail(res, 500, 'deps-missing', 'Dependências do servidor de captura ausentes.', err.message);
+  }
+
   const { url: rawUrl, width, height, dpr, mobile } = req.query || {};
   const w = Math.round(Number(width));
   const h = Math.round(Number(height));
@@ -100,4 +117,4 @@ module.exports = async (req, res) => {
   } finally {
     if (browser) await browser.close().catch(() => {});
   }
-};
+}
