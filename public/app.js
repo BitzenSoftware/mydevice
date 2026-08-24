@@ -7,28 +7,28 @@
 const MODELS = [
   // ---- Celular ----
   {
-    id: 'iphone15pro', category: 'phone', name: 'iPhone 15 Pro',
+    id: 'iphone15pro', os: 'ios_phone', category: 'phone', name: 'iPhone 15 Pro',
     viewport: { w: 393, h: 852 }, dpr: 3,
     bezel: 14, outerRadius: 62, screenRadius: 48,
     notch: 'dynamic-island', homeIndicator: true, physicalHome: false,
     body: '#1c1c1e', edge: '#3a3a3c'
   },
   {
-    id: 'iphonese', category: 'phone', name: 'iPhone SE',
+    id: 'iphonese', os: 'ios_phone', category: 'phone', name: 'iPhone SE',
     viewport: { w: 375, h: 667 }, dpr: 2,
     bezel: 18, outerRadius: 46, screenRadius: 4,
     notch: 'none', homeIndicator: false, physicalHome: true,
     body: '#111214', edge: '#38393c'
   },
   {
-    id: 'galaxys23', category: 'phone', name: 'Samsung Galaxy S23',
+    id: 'galaxys23', os: 'android_phone', category: 'phone', name: 'Samsung Galaxy S23',
     viewport: { w: 360, h: 780 }, dpr: 3,
     bezel: 10, outerRadius: 46, screenRadius: 36,
     notch: 'punch', homeIndicator: true, physicalHome: false,
     body: '#14151a', edge: '#33353d'
   },
   {
-    id: 'pixel8', category: 'phone', name: 'Google Pixel 8',
+    id: 'pixel8', os: 'android_phone', category: 'phone', name: 'Google Pixel 8',
     viewport: { w: 412, h: 915 }, dpr: 2.6,
     bezel: 12, outerRadius: 54, screenRadius: 40,
     notch: 'punch', homeIndicator: true, physicalHome: false,
@@ -37,21 +37,21 @@ const MODELS = [
 
   // ---- Tablet ----
   {
-    id: 'ipadpro', category: 'tablet', name: 'iPad Pro 11"',
+    id: 'ipadpro', os: 'ios_tablet', category: 'tablet', name: 'iPad Pro 11"',
     viewport: { w: 834, h: 1194 }, dpr: 2,
     bezel: 26, outerRadius: 40, screenRadius: 16,
     notch: 'none', homeIndicator: true, physicalHome: false,
     body: '#1c1c1e', edge: '#3a3a3c'
   },
   {
-    id: 'ipadmini', category: 'tablet', name: 'iPad Mini',
+    id: 'ipadmini', os: 'ios_tablet', category: 'tablet', name: 'iPad Mini',
     viewport: { w: 744, h: 1133 }, dpr: 2,
     bezel: 22, outerRadius: 34, screenRadius: 14,
     notch: 'none', homeIndicator: true, physicalHome: false,
     body: '#e6e6e6', edge: '#c7c7c7', bodyLight: true
   },
   {
-    id: 'galaxytab', category: 'tablet', name: 'Galaxy Tab S9',
+    id: 'galaxytab', os: 'android_tablet', category: 'tablet', name: 'Galaxy Tab S9',
     viewport: { w: 800, h: 1280 }, dpr: 2,
     bezel: 18, outerRadius: 30, screenRadius: 14,
     notch: 'punch', homeIndicator: true, physicalHome: false,
@@ -130,6 +130,7 @@ const state = {
   pendingCapture: null, // { resolve, reject } de uma captura de download em andamento
   screenEl: null,  // canvas da tela, preservado entre trocas de cor pra não reiniciar a sessão
   actualSize: false, // true = moldura em tamanho real (1:1), com rolagem no palco
+  standalone: false, // true = abre como app instalado (display-mode: standalone)
   colorByModel: {},  // modelId -> id do preset escolhido
   customByModel: {}, // modelId -> cor personalizada (hex)
 };
@@ -150,6 +151,7 @@ const els = {
   downloadBtn: document.getElementById('download-btn'),
   currentModelLabel: document.getElementById('current-model-label'),
   zoomBtn: document.getElementById('zoom-btn'),
+  standaloneToggle: document.getElementById('standalone-toggle'),
 };
 const ctx = els.canvas.getContext('2d');
 
@@ -567,6 +569,7 @@ function screenshotUrl(m) {
   const mobile = m.category === 'phone' || m.category === 'tablet';
   const params = new URLSearchParams({
     url: state.url, width: m.viewport.w, height: m.viewport.h, dpr: m.dpr, mobile: mobile ? '1' : '0',
+    os: m.os || 'desktop', standalone: state.standalone ? '1' : '0',
   });
   return '/api/screenshot?' + params.toString();
 }
@@ -643,6 +646,7 @@ function startRemoteSession() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const params = new URLSearchParams({
     url: state.url, width: m.viewport.w, height: m.viewport.h, dpr: m.dpr, mobile: mobile ? '1' : '0',
+    os: m.os || 'desktop', standalone: state.standalone ? '1' : '0',
   });
   // LIVE_ENGINE vazio significa "mesmo servidor que entregou a página"; quando
   // preenchido, o motor de navegação está hospedado em outro endereço.
@@ -1040,6 +1044,12 @@ els.form.addEventListener('submit', e => {
 });
 
 els.downloadBtn.addEventListener('click', downloadFrame);
+
+// Trocar o modo muda como a página é aberta, então a sessão precisa recomeçar.
+els.standaloneToggle.addEventListener('change', () => {
+  state.standalone = els.standaloneToggle.checked;
+  if (state.url) startSession();
+});
 
 els.zoomBtn.addEventListener('click', () => {
   state.actualSize = !state.actualSize;

@@ -212,6 +212,23 @@ html, body {
   justify-content: flex-start;
 }
 
+.toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 4px 2px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.toggle-row input { margin-top: 2px; cursor: pointer; }
+.toggle-row small {
+  display: block;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  margin-top: 2px;
+}
+
 .zoom-btn {
   background: transparent;
   color: var(--text-dim);

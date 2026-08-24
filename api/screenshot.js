@@ -8,8 +8,6 @@
 // Nada de require pesado no escopo do módulo: se algo falhar ali, a invocação
 // morre antes de qualquer tratamento e o cliente recebe um 500 mudo, sem pista
 // nenhuma. Tudo é carregado dentro do handler, sob try/catch.
-const MOBILE_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36';
-const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
 // Responde sempre em JSON com um `code`, para que uma falha possa ser
 // diagnosticada pelo navegador mesmo sem acesso aos logs da plataforma.
@@ -99,7 +97,10 @@ async function handle(req, res) {
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: w, height: h, deviceScaleFactor: scale, isMobile, hasTouch: isMobile });
-    await page.setUserAgent(isMobile ? MOBILE_UA : DESKTOP_UA);
+    const { profileFor, applyDeviceProfile, emulateStandalone } = require('../lib/device-profiles');
+    const client = await page.createCDPSession();
+    await applyDeviceProfile(client, profileFor(req.query.os));
+    if (req.query.standalone === '1') await emulateStandalone(page);
     await page.goto(rawUrl, { waitUntil: 'domcontentloaded', timeout: 25000 });
 
     // networkidle costuma estourar o tempo da função em sites com conexões

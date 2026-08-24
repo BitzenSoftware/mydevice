@@ -8,12 +8,10 @@ const fs = require('fs');
 const path = require('path');
 const { assertPublicUrl, HARDENING_ARGS } = require('./lib/safe-url');
 const site = require('./lib/site-content');
+const { profileFor, applyDeviceProfile, emulateStandalone } = require('./lib/device-profiles');
 
 const app = express();
 const PORT = process.env.PORT || 5177;
-
-const MOBILE_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36';
-const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
 // Tipos de quadro no protocolo binário (primeiro byte da mensagem)
 const FRAME_LIVE = 1;   // screencast 1x — rápido, usado enquanto o usuário interage
@@ -104,6 +102,8 @@ app.get('/api/screenshot', async (req, res) => {
   const h = Math.round(Number(req.query.height));
   const scale = Math.min(Number(req.query.dpr) || 2, 3);
   const isMobile = req.query.mobile === '1';
+  const profile = profileFor(req.query.os);
+  const standalone = req.query.standalone === '1';
 
   if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) {
     return res.status(400).json({ error: 'URL inválida. Use http:// ou https://' });
@@ -123,7 +123,9 @@ app.get('/api/screenshot', async (req, res) => {
     const browser = await getBrowser();
     page = await browser.newPage();
     await page.setViewport({ width: w, height: h, deviceScaleFactor: scale, isMobile, hasTouch: isMobile });
-    await page.setUserAgent(isMobile ? MOBILE_UA : DESKTOP_UA);
+    const shotClient = await page.createCDPSession();
+    await applyDeviceProfile(shotClient, profile);
+    if (standalone) await emulateStandalone(page);
     await page.goto(rawUrl, { waitUntil: 'networkidle2', timeout: 20000 });
     const buffer = await page.screenshot({ type: 'png' });
     res.setHeader('Content-Type', 'image/png');
@@ -172,6 +174,8 @@ wss.on('connection', async (ws, req) => {
   const height = Math.round(Number(params.get('height')));
   const dpr = Math.min(Number(params.get('dpr')) || 2, 3);
   const mobile = params.get('mobile') === '1';
+  const profile = profileFor(params.get('os'));
+  const standalone = params.get('standalone') === '1';
 
   if (!rawUrl || !/^https?:\/\//i.test(rawUrl) || !width || !height || width < 100 || height < 100) {
     ws.send(JSON.stringify({ t: 'error', message: 'Parâmetros inválidos.' }));
@@ -281,9 +285,10 @@ wss.on('connection', async (ws, req) => {
     const browser = await getBrowser();
     page = await browser.newPage();
     await page.setViewport({ width, height, deviceScaleFactor: dpr, isMobile: mobile, hasTouch: mobile });
-    await page.setUserAgent(mobile ? MOBILE_UA : DESKTOP_UA);
 
     client = await page.createCDPSession();
+    await applyDeviceProfile(client, profile);
+    if (standalone) await emulateStandalone(page);
 
     client.on('Page.screencastFrame', async ({ data, sessionId }) => {
       sendFrame(FRAME_LIVE, Buffer.from(data, 'base64'));
