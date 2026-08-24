@@ -710,7 +710,7 @@ function startRemoteSession() {
 
     els.spinner.classList.add('hidden');
     els.downloadBtn.disabled = false;
-    queued = { bytes, mime: 'image/jpeg' };
+    queued = { bytes, mime: type === FRAME_SHARP ? 'image/png' : 'image/jpeg' };
     drawNext();
   };
 

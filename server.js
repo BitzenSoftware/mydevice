@@ -301,7 +301,7 @@ wss.on('connection', async (ws, req) => {
       if (now - lastInputAt < IDLE_AFTER_MS) return;
       if (screencastOn) stopScreencast();
       if (now - lastSharpAt < SHARP_EVERY_MS) return;
-      takeSharp();
+      takeSharp(FRAME_SHARP, 'png');
     }, 120);
 
     ws.send(JSON.stringify({ t: 'ready' }));
