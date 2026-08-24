@@ -4,6 +4,9 @@
   "private": true,
   "description": "mydevice - veja e navegue por qualquer site dentro de molduras de celular, tablet e desktop, e baixe o mockup em PNG transparente.",
   "main": "server.js",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "start": "node server.js",
     "build": "node scripts/build-static.js",

@@ -16,8 +16,8 @@ module.exports = async (_req, res) => {
     catch (err) { out.steps[nome] = { ok: false, erro: err.message }; }
   };
 
-  await step('requirePuppeteer', () => {
-    const p = require('puppeteer-core');
+  await step('importPuppeteer', async () => {
+    const p = (await import('puppeteer-core')).default;
     return { temLaunch: typeof p.launch === 'function', temDefaultArgs: typeof p.defaultArgs === 'function' };
   });
 
@@ -26,8 +26,8 @@ module.exports = async (_req, res) => {
     return { flags: HARDENING_ARGS.length };
   });
 
-  await step('requireChromium', () => {
-    const mod = require('@sparticuz/chromium');
+  await step('importChromium', async () => {
+    const mod = await import('@sparticuz/chromium');
     const c = mod.default || mod;
     return { viaDefault: !!mod.default, args: Array.isArray(c.args) ? c.args.length : null };
   });
@@ -45,7 +45,7 @@ module.exports = async (_req, res) => {
   // Esta é a etapa cara: descompacta o Chromium em /tmp. Se falhar aqui, o
   // problema é empacotamento ou espaço, não o navegador em si.
   await step('executablePath', async () => {
-    const mod = require('@sparticuz/chromium');
+    const mod = await import('@sparticuz/chromium');
     const c = mod.default || mod;
     c.setGraphicsMode = false;
     const t = Date.now();

@@ -28,9 +28,13 @@ module.exports = async (req, res) => {
 };
 
 async function handle(req, res) {
+  // puppeteer-core e @sparticuz/chromium são ESM puros. Em CommonJS eles só
+  // podem ser carregados por import() dinâmico: o require() de um módulo ESM
+  // funciona a partir do Node 22.12, e a plataforma pode estar numa versão
+  // anterior — foi exatamente o que quebrou aqui.
   let puppeteer, assertPublicUrl, HARDENING_ARGS;
   try {
-    puppeteer = require('puppeteer-core');
+    puppeteer = (await import('puppeteer-core')).default;
     ({ assertPublicUrl, HARDENING_ARGS } = require('../lib/safe-url'));
   } catch (err) {
     return fail(res, 500, 'deps-missing', 'Dependências do servidor de captura ausentes.', err.message);
@@ -55,13 +59,12 @@ async function handle(req, res) {
     return fail(res, 400, 'blocked', err.message);
   }
 
-  // O require fica aqui dentro: se o pacote do Chromium não tiver sido
-  // empacotado junto com a função, o erro vira uma resposta JSON legível em
-  // vez de derrubar a invocação inteira antes de qualquer tratamento.
-  // O pacote é ESM, então em CommonJS o objeto real vem em `.default`.
+  // Carregado aqui dentro: se o pacote do Chromium não tiver sido empacotado
+  // junto com a função, o erro vira uma resposta JSON legível em vez de
+  // derrubar a invocação inteira antes de qualquer tratamento.
   let chromium;
   try {
-    const mod = require('@sparticuz/chromium');
+    const mod = await import('@sparticuz/chromium');
     chromium = mod.default || mod;
     if (!Array.isArray(chromium.args)) throw new Error('API inesperada do @sparticuz/chromium');
   } catch (err) {

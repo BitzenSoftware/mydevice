@@ -1,7 +1,9 @@
 const express = require('express');
 const http = require('http');
 const { WebSocketServer } = require('ws');
-const puppeteer = require('puppeteer-core');
+// puppeteer-core é ESM: require() dele só funciona a partir do Node 22.12.
+// Carregar por import() dinâmico mantém o servidor rodando em qualquer versão.
+const puppeteerPromise = import('puppeteer-core').then(m => m.default);
 const fs = require('fs');
 const path = require('path');
 const { assertPublicUrl, HARDENING_ARGS } = require('./lib/safe-url');
@@ -52,11 +54,11 @@ if (!executablePath) {
 let browserPromise = null;
 function getBrowser() {
   if (!browserPromise) {
-    browserPromise = puppeteer.launch({
+    browserPromise = puppeteerPromise.then(puppeteer => puppeteer.launch({
       executablePath,
       headless: true,
       args: HARDENING_ARGS,
-    });
+    }));
     browserPromise.catch(() => { browserPromise = null; });
   }
   return browserPromise;
