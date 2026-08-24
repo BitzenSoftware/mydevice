@@ -129,6 +129,7 @@ const state = {
   liveOuter: null, // { w, h } do frame ao vivo atual, pra reposicionar no resize
   pendingCapture: null, // { resolve, reject } de uma captura de download em andamento
   screenEl: null,  // canvas da tela, preservado entre trocas de cor pra não reiniciar a sessão
+  actualSize: false, // true = moldura em tamanho real (1:1), com rolagem no palco
   colorByModel: {},  // modelId -> id do preset escolhido
   customByModel: {}, // modelId -> cor personalizada (hex)
 };
@@ -148,6 +149,7 @@ const els = {
   spinner: document.getElementById('spinner'),
   downloadBtn: document.getElementById('download-btn'),
   currentModelLabel: document.getElementById('current-model-label'),
+  zoomBtn: document.getElementById('zoom-btn'),
 };
 const ctx = els.canvas.getContext('2d');
 
@@ -514,7 +516,9 @@ function layoutLiveFrame(outerW, outerH) {
   const stage = document.getElementById('stage');
   const availW = Math.max(stage.clientWidth - 20, 100);
   const availH = Math.max(stage.clientHeight - 20, 100);
-  const scale = Math.min(availW / outerW, availH / outerH);
+  // Reduzir a moldura pra caber na janela encolhe junto o conteúdo do site,
+  // que é o que fazia o texto parecer borrado. Em 100% o palco rola.
+  const scale = state.actualSize ? 1 : Math.min(availW / outerW, availH / outerH);
   sizer.style.width = (outerW * scale) + 'px';
   sizer.style.height = (outerH * scale) + 'px';
   frameEl.style.transform = `scale(${scale})`;
@@ -1036,6 +1040,14 @@ els.form.addEventListener('submit', e => {
 });
 
 els.downloadBtn.addEventListener('click', downloadFrame);
+
+els.zoomBtn.addEventListener('click', () => {
+  state.actualSize = !state.actualSize;
+  els.zoomBtn.textContent = state.actualSize ? 'Ajustar à janela' : 'Ver em 100%';
+  els.zoomBtn.classList.toggle('active', state.actualSize);
+  document.getElementById('stage').classList.toggle('actual-size', state.actualSize);
+  if (state.liveOuter) layoutLiveFrame(state.liveOuter.w, state.liveOuter.h);
+});
 
 window.addEventListener('resize', () => {
   if (state.liveOuter) layoutLiveFrame(state.liveOuter.w, state.liveOuter.h);

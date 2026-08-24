@@ -205,6 +205,24 @@ html, body {
   height: 100%;
   max-height: calc(100vh - 190px);
 }
+/* Em 100% a moldura sai em tamanho real e o palco passa a rolar. */
+.stage.actual-size {
+  overflow: auto;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.zoom-btn {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.zoom-btn:hover { color: var(--text); }
+.zoom-btn.active { color: var(--text); border-color: var(--accent); }
 
 #preview-canvas {
   max-width: 100%;
