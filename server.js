@@ -97,6 +97,28 @@ async function openPage(label) {
   }
 }
 
+// Um celular de verdade tem GPS, e apps que dependem dele (marcação de ponto,
+// entrega, mapas) travam logo na abertura se a permissão for negada — que é o
+// padrão do Chrome headless. Conceder sem posição não resolve: getCurrentPosition
+// fica pendurado até dar erro. Por isso vai junto uma coordenada, ajustável por
+// GEO_LAT/GEO_LON pra quem precisa testar geocerca de um endereço específico.
+const GEO = {
+  latitude: Number(process.env.GEO_LAT ?? -23.5505),
+  longitude: Number(process.env.GEO_LON ?? -46.6333),
+  accuracy: Number(process.env.GEO_ACCURACY ?? 30),
+};
+
+async function allowGeolocation(page, rawUrl) {
+  try {
+    const origin = new URL(rawUrl).origin;
+    await page.browserContext().overridePermissions(origin, ['geolocation']);
+    await page.setGeolocation(GEO);
+  } catch (err) {
+    // Sem GPS o site ainda abre; não vale derrubar a sessão por causa disso.
+    console.error('[geo] não foi possível liberar a localização:', err.message);
+  }
+}
+
 // Um Chrome sobrecarregado para de responder sem desconectar: os awaits ficam
 // pendurados pra sempre e o cliente vê só o spinner girando. O prazo aqui
 // transforma isso num erro visível e força a troca do navegador.
@@ -177,6 +199,7 @@ app.get('/api/screenshot', async (req, res) => {
     const shotClient = await page.createCDPSession();
     await applyDeviceProfile(shotClient, profile);
     if (standalone) await emulateStandalone(page);
+    await allowGeolocation(page, rawUrl);
     await page.goto(rawUrl, { waitUntil: 'networkidle2', timeout: 20000 });
     const buffer = await page.screenshot({ type: 'png' });
     res.setHeader('Content-Type', 'image/png');
@@ -343,6 +366,7 @@ wss.on('connection', async (ws, req) => {
     client = await withTimeout(page.createCDPSession(), 'sessao CDP');
     await withTimeout(applyDeviceProfile(client, profile), 'perfil do aparelho');
     if (standalone) await withTimeout(emulateStandalone(page), 'modo app instalado');
+    await withTimeout(allowGeolocation(page, rawUrl), 'liberar localizacao');
 
     client.on('Page.screencastFrame', async ({ data, sessionId }) => {
       sendFrame(FRAME_LIVE, Buffer.from(data, 'base64'));
