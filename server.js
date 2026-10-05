@@ -454,6 +454,21 @@ wss.on('connection', async (ws, req) => {
 
 });
 
+// Uma sessão que falha não pode derrubar o servidor inteiro. O caminho do
+// navegador é cheio de promises que rejeitam tarde (aba fechada no meio de um
+// screenshot, Chrome morrendo durante um comando CDP), e qualquer uma delas sem
+// tratamento encerra o processo — deixando todo mundo sem serviço por causa de
+// um visitante. Aqui viram log, e o navegador é descartado pra que a próxima
+// sessão suba um limpo.
+process.on('unhandledRejection', err => {
+  const msg = (err && err.message) || String(err);
+  console.error('[processo] promise rejeitada sem tratamento:', msg);
+  if (/Target closed|Session closed|Connection closed|Protocol error/i.test(msg)) dropBrowser(msg);
+});
+process.on('uncaughtException', err => {
+  console.error('[processo] exceção não capturada:', (err && err.stack) || err);
+});
+
 server.listen(PORT, () => {
   console.log(`mydevice rodando em http://localhost:${PORT}`);
   console.log(`Usando navegador: ${executablePath}`);

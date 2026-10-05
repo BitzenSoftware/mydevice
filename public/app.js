@@ -590,6 +590,23 @@ function screenshotUrl(m) {
   return '/api/screenshot?' + params.toString();
 }
 
+// Nesta hospedagem não existe navegação: o resultado é uma foto. Dizer isso na
+// tela evita o que mais confunde aqui — clicar num botão do site e não
+// acontecer absolutamente nada, sem erro nenhum.
+function showStaticNotice() {
+  let el = document.getElementById('static-notice');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'static-notice';
+    el.className = 'static-notice';
+    el.innerHTML = '<strong>Prévia estática</strong> — esta é uma imagem do site, '
+      + 'por isso cliques e rolagem não funcionam. A navegação ao vivo precisa do '
+      + 'motor de navegação ligado.';
+    els.liveFrame.parentNode.insertBefore(el, els.liveFrame);
+  }
+  el.classList.remove('hidden');
+}
+
 async function startStaticSession() {
   closeSession();
   const gen = ++state.sessionGen;
@@ -602,6 +619,10 @@ async function startStaticSession() {
   clearError();
 
   const screenEl = buildRemoteScreen(m.viewport.w, m.viewport.h, m.dpr);
+  // Sem motor ao vivo o que aparece é uma foto. Marcar o canvas tira o cursor
+  // de clique: sem isso a tela convida a clicar e não responde nada, e a pessoa
+  // fica tentando apertar botões de uma imagem sem entender o que houve.
+  screenEl.classList.add('static-shot');
   state.screenEl = screenEl;
   rebuildFrame();
   els.currentModelLabel.textContent = m.name;
@@ -629,6 +650,7 @@ async function startStaticSession() {
     bitmap.close();
     state.staticShot = true;
     els.downloadBtn.disabled = false;
+    showStaticNotice();
   } catch (err) {
     if (gen === state.sessionGen) showError(err.message);
   } finally {
@@ -642,6 +664,8 @@ function startSession() {
 
 function startRemoteSession() {
   closeSession();
+  const notice = document.getElementById('static-notice');
+  if (notice) notice.classList.add('hidden');
   const gen = ++state.sessionGen;
   const m = currentModel();
   const mobile = m.category === 'phone' || m.category === 'tablet';
