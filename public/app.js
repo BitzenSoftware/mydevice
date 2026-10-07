@@ -131,6 +131,7 @@ const state = {
   screenEl: null,  // canvas da tela, preservado entre trocas de cor pra não reiniciar a sessão
   actualSize: true, // moldura em tamanho real (1:1): encolher pra caber borra o conteudo
   standalone: false, // true = abre como app instalado (display-mode: standalone)
+  recording: null,   // { rec, raf, inicio } enquanto um video esta sendo gravado
   colorByModel: {},  // modelId -> id do preset escolhido
   customByModel: {}, // modelId -> cor personalizada (hex)
 };
@@ -152,6 +153,7 @@ const els = {
   currentModelLabel: document.getElementById('current-model-label'),
   zoomBtn: document.getElementById('zoom-btn'),
   standaloneToggle: document.getElementById('standalone-toggle'),
+  recordBtn: document.getElementById('record-btn'),
 };
 const ctx = els.canvas.getContext('2d');
 
@@ -541,6 +543,9 @@ function layoutLiveFrame(outerW, outerH) {
 }
 
 function closeSession() {
+  // Uma gravacao em andamento perde a fonte quando a sessao troca; melhor
+  // fechar o arquivo com o que ja foi gravado do que seguir gravando parado.
+  if (state.recording) stopRecording();
   if (state.ws) {
     // Marca antes de fechar pra que o onclose não trate isto como queda.
     state.ws.intentionalClose = true;
@@ -650,6 +655,7 @@ async function startStaticSession() {
     bitmap.close();
     state.staticShot = true;
     els.downloadBtn.disabled = false;
+    updateRecordButton();
     showStaticNotice();
   } catch (err) {
     if (gen === state.sessionGen) showError(err.message);
@@ -758,7 +764,11 @@ function startRemoteSession() {
 
     els.spinner.classList.add('hidden');
     els.downloadBtn.disabled = false;
-    queued = { bytes, mime: type === FRAME_SHARP ? 'image/png' : 'image/jpeg' };
+    updateRecordButton();
+    // O formato vem do proprio conteudo, nao do tipo do quadro: o servidor cai
+    // pra JPEG quando o PNG fica lento demais, e rotular errado quebra o decode.
+    const ehPng = bytes[0] === 0x89 && bytes[1] === 0x50;
+    queued = { bytes, mime: ehPng ? 'image/png' : 'image/jpeg' };
     drawNext();
   };
 
@@ -777,6 +787,106 @@ function startRemoteSession() {
     els.spinner.classList.add('hidden');
     showError('A sessão foi encerrada. Clique em Carregar para abrir de novo.');
   };
+}
+
+// ---------- Gravação em vídeo ----------
+// Grava o mockup inteiro — moldura junto — e não só a tela do site, que é o que
+// torna o vídeo utilizável numa página de produto ou numa rede social. Os
+// quadros são compostos no navegador a partir do canvas que já recebe a sessão
+// ao vivo, então gravar não custa nada ao servidor nem pede ffmpeg.
+const REC_FPS = 30;
+
+function recorderMimeType() {
+  // Nem todo navegador aceita os mesmos contêineres; o primeiro que passar vale.
+  const candidatos = [
+    'video/mp4;codecs=avc1',       // abre direto no Windows e no celular
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  return candidatos.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+}
+
+function startRecording() {
+  if (!state.screenEl || !LIVE_AVAILABLE) {
+    showError('A gravação precisa da navegação ao vivo.');
+    return;
+  }
+  if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) {
+    showError('Este navegador não suporta gravação de vídeo.');
+    return;
+  }
+
+  const m = currentModel();
+  const dims = mockupDims(m);
+  const SCALE = 2; // vídeo em 2x: nítido sem estourar o tamanho do arquivo
+
+  // Canvas próprio: o do download muda de tamanho a cada uso e isso cortaria a
+  // gravação no meio.
+  const canvas = document.createElement('canvas');
+  // Dimensão par nos dois lados — codificadores de vídeo recusam ímpar.
+  canvas.width = Math.round(dims.w * SCALE / 2) * 2;
+  canvas.height = Math.round(dims.h * SCALE / 2) * 2;
+  const c = canvas.getContext('2d');
+  c.setTransform(canvas.width / dims.w, 0, 0, canvas.height / dims.h, 0, 0);
+
+  const mimeType = recorderMimeType();
+  const stream = canvas.captureStream(REC_FPS);
+  let rec;
+  try {
+    rec = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 8_000_000 } : undefined);
+  } catch (err) {
+    showError('Não foi possível iniciar a gravação: ' + err.message);
+    return;
+  }
+
+  const pedacos = [];
+  rec.ondataavailable = e => { if (e.data && e.data.size) pedacos.push(e.data); };
+  rec.onstop = () => {
+    cancelAnimationFrame(state.recording.raf);
+    const tipo = rec.mimeType || mimeType || 'video/webm';
+    const ext = tipo.includes('mp4') ? 'mp4' : 'webm';
+    const blob = new Blob(pedacos, { type: tipo });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `mockup-${m.id}-${Date.now()}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+    state.recording = null;
+    updateRecordButton();
+  };
+
+  const desenhar = () => {
+    if (!state.recording) return;
+    // state.screenEl é o canvas da sessão; desenhar a partir dele pega o quadro
+    // mais recente sem pedir nada ao servidor.
+    paintMockup(c, m, state.screenEl, dims);
+    state.recording.raf = requestAnimationFrame(desenhar);
+  };
+
+  state.recording = { rec, raf: 0, inicio: Date.now() };
+  desenhar();
+  rec.start(1000);
+  updateRecordButton();
+}
+
+function stopRecording() {
+  if (!state.recording) return;
+  try { state.recording.rec.stop(); } catch { state.recording = null; updateRecordButton(); }
+}
+
+function updateRecordButton() {
+  const btn = els.recordBtn;
+  if (!btn) return;
+  const gravando = !!state.recording;
+  btn.classList.toggle('recording', gravando);
+  btn.textContent = gravando ? 'Parar gravação' : 'Gravar vídeo';
+  btn.disabled = !LIVE_AVAILABLE || !state.screenEl;
+  btn.title = LIVE_AVAILABLE
+    ? 'Grava a navegação com a moldura, em vídeo'
+    : 'A gravação precisa da navegação ao vivo';
 }
 
 function requestCapture() {
@@ -1049,6 +1159,35 @@ function drawBrowserWindow(c, m, img, url) {
   return { outerW, outerH };
 }
 
+// Tamanho do mockup pronto (moldura + tela) em px lógicos. Separado do desenho
+// porque a gravação precisa dimensionar o canvas uma vez só: mexer em
+// canvas.width a cada quadro limparia o canvas e atrapalharia o stream.
+function mockupDims(m) {
+  if (m.type === 'laptop') {
+    const screenOuterW = m.viewport.w + m.bezel * 2, screenOuterH = m.viewport.h + m.bezel * 2;
+    const baseH = screenOuterW * 0.045, baseOverhang = screenOuterW * 0.035;
+    return { w: screenOuterW + baseOverhang * 2, h: screenOuterH + baseH + 6 };
+  }
+  if (m.type === 'monitor') {
+    const screenOuterW = m.viewport.w + m.bezel * 2, screenOuterH = m.viewport.h + m.bezel * 2;
+    const neckH = screenOuterW * 0.05, footH = screenOuterW * 0.018;
+    return { w: screenOuterW, h: screenOuterH + neckH + footH + 6 };
+  }
+  if (m.type === 'browser') return { w: m.viewport.w, h: m.viewport.h + 42 };
+  return { w: m.viewport.w + m.bezel * 2, h: m.viewport.h + m.bezel * 2 };
+}
+
+// Pinta o aparelho com a tela dada num contexto já dimensionado e escalado.
+function paintMockup(c, m, img, dims) {
+  c.clearRect(0, 0, dims.w, dims.h);
+  switch (m.type) {
+    case 'laptop': drawLaptop(c, m, img); break;
+    case 'monitor': drawMonitor(c, m, img); break;
+    case 'browser': drawBrowserWindow(c, m, img, state.url); break;
+    default: drawPhoneOrTablet(c, m, img); break;
+  }
+}
+
 function drawDownloadCanvas(m, img) {
   const EXPORT_SCALE = 2;
   let dims;
@@ -1093,6 +1232,7 @@ els.form.addEventListener('submit', e => {
 });
 
 els.downloadBtn.addEventListener('click', downloadFrame);
+els.recordBtn.addEventListener('click', () => (state.recording ? stopRecording() : startRecording()));
 
 // Trocar o modo muda como a página é aberta, então a sessão precisa recomeçar.
 els.standaloneToggle.addEventListener('change', () => {

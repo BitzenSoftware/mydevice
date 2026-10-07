@@ -469,3 +469,23 @@ body.actual-size .stage {
 .static-notice.hidden { display: none; }
 /* precisa casar a especificidade da regra que define cursor: pointer */
 .device-screen canvas.remote-canvas.static-shot { cursor: default; }
+
+/* Botao de gravacao */
+.record-btn {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.record-btn:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+.record-btn:disabled { opacity: 0.45; cursor: default; }
+.record-btn.recording {
+  color: #fff;
+  background: #b3303b;
+  border-color: #d8434f;
+  animation: rec-pulse 1.4s ease-in-out infinite;
+}
+@keyframes rec-pulse { 50% { opacity: 0.72; } }

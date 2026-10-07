@@ -20,7 +20,7 @@ const FRAME_SHOT = 3;   // PNG da captura pedida pelo botão de download
 
 const IDLE_AFTER_MS = 300;      // tempo sem interação até começar a mandar quadros nítidos
 const SHARP_EVERY_MS = 700;     // intervalo entre quadros nítidos enquanto está parado
-const SHARP_TIMEOUT_MS = 3000;  // desiste de uma captura nítida travada
+const SHARP_TIMEOUT_MS = 6000;  // desiste de uma captura nítida travada (PNG 3x e pesado)
 const MAX_BUFFERED_BYTES = 2 * 1024 * 1024; // se o socket entupir, pula quadros
 
 // Reusa um Chrome/Chromium já instalado em vez de baixar outro: no contêiner
@@ -287,6 +287,8 @@ wss.on('connection', async (ws, req) => {
   let lastInputAt = Date.now();
   let lastSharpAt = 0;     // último quadro nítido enviado
   let shotInFlight = false;
+  let jpegFallback = false; // PNG estourou o prazo vezes demais nesta sessao
+  let pngLentos = 0;
   let screencastOn = false;
 
   const cleanup = async () => {
@@ -344,12 +346,27 @@ wss.on('connection', async (ws, req) => {
     while (shotInFlight && !closed) await new Promise(r => setTimeout(r, 25));
     if (closed) return;
     shotInFlight = true;
-    const opts = format === 'png' ? { type: 'png' } : { type: 'jpeg', quality: 92 };
+    // O PNG do quadro parado passa de 1 MB num celular 3x, e numa máquina
+    // ocupada ele estoura o prazo. Antes isso não enviava nada e não dizia
+    // nada: a tela ficava no spinner pra sempre. Agora, quando o PNG não dá
+    // conta, a sessão passa a mandar JPEG — menos nítido, mas chega.
+    const usarPng = format === 'png' && !jpegFallback;
+    const opts = usarPng ? { type: 'png' } : { type: 'jpeg', quality: 92 };
     const shot = page.screenshot(opts).catch(() => null);
-    const buffer = await Promise.race([
+    let buffer = await Promise.race([
       shot,
       new Promise(resolve => setTimeout(() => resolve(null), SHARP_TIMEOUT_MS)),
     ]);
+    if (!buffer && usarPng) {
+      if (++pngLentos >= 2) {
+        jpegFallback = true;
+        console.warn('[sessao] PNG lento demais; passando a enviar JPEG nesta sessão');
+      }
+      buffer = await Promise.race([
+        page.screenshot({ type: 'jpeg', quality: 92 }).catch(() => null),
+        new Promise(resolve => setTimeout(() => resolve(null), SHARP_TIMEOUT_MS)),
+      ]);
+    }
     shotInFlight = false;
     if (buffer) {
       lastSharpAt = Date.now();
@@ -458,12 +475,15 @@ wss.on('connection', async (ws, req) => {
 // navegador é cheio de promises que rejeitam tarde (aba fechada no meio de um
 // screenshot, Chrome morrendo durante um comando CDP), e qualquer uma delas sem
 // tratamento encerra o processo — deixando todo mundo sem serviço por causa de
-// um visitante. Aqui viram log, e o navegador é descartado pra que a próxima
-// sessão suba um limpo.
+// um visitante. Aqui viram apenas log.
+//
+// Deliberadamente NÃO se descarta o navegador por causa delas: fechar um Chrome
+// produz justamente essas rejeições ("Target closed") logo em seguida, e
+// descartar nesse momento mataria o navegador novo que a tentativa seguinte
+// acabou de abrir — um laço que derrubava todo Chrome saudável. Quem descarta é
+// o código da sessão, que sabe qual navegador falhou.
 process.on('unhandledRejection', err => {
-  const msg = (err && err.message) || String(err);
-  console.error('[processo] promise rejeitada sem tratamento:', msg);
-  if (/Target closed|Session closed|Connection closed|Protocol error/i.test(msg)) dropBrowser(msg);
+  console.error('[processo] promise rejeitada sem tratamento:', (err && err.message) || err);
 });
 process.on('uncaughtException', err => {
   console.error('[processo] exceção não capturada:', (err && err.stack) || err);
