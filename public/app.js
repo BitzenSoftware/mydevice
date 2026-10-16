@@ -132,6 +132,7 @@ const state = {
   actualSize: true, // moldura em tamanho real (1:1): encolher pra caber borra o conteudo
   standalone: false, // true = abre como app instalado (display-mode: standalone)
   recording: null,   // { rec, raf, inicio } enquanto um video esta sendo gravado
+  brand: { logo: null, logoUrl: '', texto: '' }, // marca na base do notebook
   colorByModel: {},  // modelId -> id do preset escolhido
   customByModel: {}, // modelId -> cor personalizada (hex)
 };
@@ -154,6 +155,11 @@ const els = {
   zoomBtn: document.getElementById('zoom-btn'),
   standaloneToggle: document.getElementById('standalone-toggle'),
   recordBtn: document.getElementById('record-btn'),
+  brandSection: document.getElementById('brand-section'),
+  brandText: document.getElementById('brand-text'),
+  brandLogo: document.getElementById('brand-logo'),
+  brandLogoClear: document.getElementById('brand-logo-clear'),
+  brandLogoName: document.getElementById('brand-logo-name'),
 };
 const ctx = els.canvas.getContext('2d');
 
@@ -237,6 +243,7 @@ function selectModel(id) {
   els.currentModelLabel.textContent = currentModel().name;
   renderModelList();
   renderColorSwatches();
+  updateBrandSection();
   if (state.url) startSession();
 }
 
@@ -453,6 +460,12 @@ function buildLaptopFrame(m, screenEl) {
   const notchW = screenOuterW * 0.1;
   frame.appendChild(domEl('div', 'frame-decor',
     `left:${sox + (screenOuterW - notchW) / 2}px; top:${baseTopY + baseH - 4}px; width:${notchW}px; height:5px; border-radius:2px; background:rgba(0,0,0,0.15);`));
+
+  const marca = brandEl(outerW, baseH, corSobre(m.body));
+  if (marca) {
+    marca.style.top = `${baseTopY}px`;
+    frame.appendChild(marca);
+  }
 
   return { frameEl: frame, outerW, outerH };
 }
@@ -1031,6 +1044,79 @@ function drawPhoneOrTablet(c, m, img) {
   return { outerW, outerH };
 }
 
+// ---------- Marca na base do notebook ----------
+// A base do laptop é a única superfície grande e vazia da moldura, então é onde
+// cabe identificar de quem é o mockup. Vale para o desenho ao vivo (DOM), para
+// o PNG e para o vídeo, que usam caminhos diferentes — daí o cálculo ficar
+// separado do desenho.
+function brandLayout(baseW, baseH) {
+  return {
+    alturaLogo: baseH * 0.68,
+    fonte: Math.max(7, baseH * 0.40),
+    espaco: baseH * 0.24,
+  };
+}
+
+function temMarca() {
+  return !!(state.brand.logo || (state.brand.texto || '').trim());
+}
+
+// Desenha logo e texto centralizados na faixa da base, no canvas.
+function paintBrand(c, baseX, baseY, baseW, baseH, corTexto) {
+  if (!temMarca()) return;
+  const { alturaLogo, fonte, espaco } = brandLayout(baseW, baseH);
+  const texto = (state.brand.texto || '').trim();
+  const logo = state.brand.logo;
+
+  let larguraLogo = 0;
+  if (logo && logo.naturalWidth) {
+    larguraLogo = alturaLogo * (logo.naturalWidth / logo.naturalHeight);
+  }
+  c.save();
+  c.font = `600 ${fonte}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+  c.textBaseline = 'middle';
+  const larguraTexto = texto ? c.measureText(texto).width : 0;
+  const total = larguraLogo + (larguraLogo && texto ? espaco : 0) + larguraTexto;
+  // Nunca deixa a marca encostar nas bordas inclinadas da base.
+  const limite = baseW * 0.7;
+  const escala = total > limite ? limite / total : 1;
+
+  let x = baseX + (baseW - total * escala) / 2;
+  const meio = baseY + baseH / 2;
+  if (larguraLogo) {
+    const lw = larguraLogo * escala, lh = alturaLogo * escala;
+    try { c.drawImage(logo, x, meio - lh / 2, lw, lh); } catch {}
+    x += lw + (texto ? espaco * escala : 0);
+  }
+  if (texto) {
+    c.font = `600 ${fonte * escala}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+    c.fillStyle = corTexto;
+    c.fillText(texto, x, meio);
+  }
+  c.restore();
+}
+
+// Versão em DOM, para a moldura ao vivo.
+function brandEl(baseW, baseH, corTexto) {
+  if (!temMarca()) return null;
+  const { alturaLogo, fonte, espaco } = brandLayout(baseW, baseH);
+  const wrap = domEl('div', 'frame-decor brand-wrap',
+    `left:0px; top:0px; width:${baseW}px; height:${baseH}px; display:flex; align-items:center; justify-content:center; gap:${espaco}px; color:${corTexto}; overflow:hidden;`);
+  if (state.brand.logoUrl) {
+    const img = document.createElement('img');
+    img.src = state.brand.logoUrl;
+    img.style.cssText = `height:${alturaLogo}px; width:auto; max-width:${baseW * 0.45}px; object-fit:contain;`;
+    wrap.appendChild(img);
+  }
+  const texto = (state.brand.texto || '').trim();
+  if (texto) {
+    const span = domEl('div', '', `font-size:${fonte}px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:${baseW * 0.6}px;`);
+    span.textContent = texto;
+    wrap.appendChild(span);
+  }
+  return wrap;
+}
+
 function drawLaptop(c, m, img) {
   const vw = m.viewport.w, vh = m.viewport.h, b = m.bezel;
   const screenOuterW = vw + b * 2, screenOuterH = vh + b * 2;
@@ -1075,7 +1161,18 @@ function drawLaptop(c, m, img) {
   c.fillStyle = 'rgba(0,0,0,0.15)';
   c.fill();
 
+  paintBrand(c, 0, baseTopY, outerW, baseH, corSobre(m.body));
+
   return { outerW, outerH };
+}
+
+// Preto ou branco, conforme a cor da base, pra marca nunca sumir no fundo.
+function corSobre(hex) {
+  const n = parseInt(String(hex).replace('#', ''), 16);
+  if (Number.isNaN(n)) return '#1b1c1e';
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  // luminância relativa aproximada
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? '#1b1c1e' : '#f2f3f5';
 }
 
 function drawMonitor(c, m, img) {
@@ -1233,6 +1330,57 @@ els.form.addEventListener('submit', e => {
 
 els.downloadBtn.addEventListener('click', downloadFrame);
 els.recordBtn.addEventListener('click', () => (state.recording ? stopRecording() : startRecording()));
+
+// ---------- Marca na base ----------
+// Só a moldura de notebook tem uma superfície grande o bastante; nas outras a
+// seção some pra não oferecer um ajuste que não teria efeito.
+function updateBrandSection() {
+  const ehLaptop = currentModel().type === 'laptop';
+  els.brandSection.classList.toggle('hidden', !ehLaptop);
+}
+
+// Redesenha só a moldura, sem reiniciar a sessão nem recarregar o site.
+function aplicarMarca() {
+  if (state.screenEl) rebuildFrame();
+}
+
+els.brandText.addEventListener('input', () => {
+  state.brand.texto = els.brandText.value;
+  aplicarMarca();
+});
+
+els.brandLogo.addEventListener('change', () => {
+  const file = els.brandLogo.files && els.brandLogo.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    showError('O logo deve ter no máximo 2 MB.');
+    els.brandLogo.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      state.brand.logo = img;
+      state.brand.logoUrl = reader.result;
+      els.brandLogoName.textContent = file.name;
+      els.brandLogoClear.classList.remove('hidden');
+      aplicarMarca();
+    };
+    img.onerror = () => showError('Não foi possível ler esse arquivo de imagem.');
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+els.brandLogoClear.addEventListener('click', () => {
+  state.brand.logo = null;
+  state.brand.logoUrl = '';
+  els.brandLogo.value = '';
+  els.brandLogoName.textContent = '';
+  els.brandLogoClear.classList.add('hidden');
+  aplicarMarca();
+});
 
 // Trocar o modo muda como a página é aberta, então a sessão precisa recomeçar.
 els.standaloneToggle.addEventListener('change', () => {

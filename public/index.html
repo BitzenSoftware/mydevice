@@ -107,6 +107,17 @@
         </span>
       </label>
 
+      <div id="brand-section" class="hidden">
+        <div class="sidebar-section-title">Marca na base</div>
+        <input type="text" id="brand-text" class="brand-text" placeholder="Texto na base" maxlength="48">
+        <div class="brand-logo-row">
+          <label class="brand-logo-btn" for="brand-logo">Escolher logo</label>
+          <input type="file" id="brand-logo" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden>
+          <button type="button" id="brand-logo-clear" class="brand-clear hidden" title="Remover logo">✕</button>
+        </div>
+        <div id="brand-logo-name" class="brand-logo-name"></div>
+      </div>
+
       <div class="sidebar-section-title">Exportar</div>
       <div class="toolbar">
         <div class="current-model" id="current-model-label">—</div>

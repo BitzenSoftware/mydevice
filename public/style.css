@@ -499,3 +499,49 @@ body.actual-size .stage {
   animation: rec-pulse 1.4s ease-in-out infinite;
 }
 @keyframes rec-pulse { 50% { opacity: 0.72; } }
+
+/* Marca na base do notebook */
+#brand-section.hidden { display: none; }
+.brand-text {
+  width: 100%;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  outline: none;
+}
+.brand-text:focus { border-color: var(--accent); }
+.brand-logo-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.brand-logo-btn {
+  flex: 1;
+  text-align: center;
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.brand-logo-btn:hover { color: var(--text); border-color: var(--accent); }
+.brand-clear {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 8px;
+  padding: 7px 9px;
+  cursor: pointer;
+  line-height: 1;
+}
+.brand-clear:hover { color: var(--danger); border-color: var(--danger); }
+.brand-clear.hidden { display: none; }
+.brand-logo-name {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
