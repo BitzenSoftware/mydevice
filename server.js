@@ -289,6 +289,7 @@ wss.on('connection', async (ws, req) => {
   let shotInFlight = false;
   let jpegFallback = false; // PNG estourou o prazo vezes demais nesta sessao
   let pngLentos = 0;
+  let navegouUmaVez = false; // a navegação inicial já assentou?
   let screencastOn = false;
 
   const cleanup = async () => {
@@ -401,13 +402,23 @@ wss.on('connection', async (ws, req) => {
       if (now - lastInputAt < IDLE_AFTER_MS) return;
       if (screencastOn) stopScreencast();
       if (now - lastSharpAt < SHARP_EVERY_MS) return;
+      // Antes da navegação inicial assentar, não se pede captura: um
+      // Page.captureScreenshot disparado enquanto o frame principal está sendo
+      // trocado pode não responder nunca, e como os comandos de uma sessão CDP
+      // são atendidos em fila, ele leva junto tudo o que vier depois —
+      // inclusive o screencast. O resultado era a tela parada pra sempre.
+      if (!navegouUmaVez) return;
       takeSharp(FRAME_SHARP, 'png');
     }, 120);
 
     ws.send(JSON.stringify({ t: 'ready' }));
 
     page.goto(rawUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
+      .then(() => { navegouUmaVez = true; })
       .catch(() => {
+        // Mesmo falhando, libera as capturas: o que estiver na tela (uma página
+        // de erro, por exemplo) ainda deve ser mostrado.
+        navegouUmaVez = true;
         if (ws.readyState === ws.OPEN) {
           ws.send(JSON.stringify({ t: 'error', message: 'Não foi possível abrir essa URL.' }));
         }
