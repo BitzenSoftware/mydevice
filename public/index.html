@@ -106,6 +106,16 @@
           <small>Faz o site responder como PWA na tela inicial</small>
         </span>
       </label>
+
+      <div class="sidebar-section-title">Exportar</div>
+      <div class="toolbar">
+        <div class="current-model" id="current-model-label">—</div>
+        <button id="zoom-btn" class="zoom-btn" type="button">Ver em 100%</button>
+        <button id="download-btn" class="download-btn" disabled>
+          Baixar moldura <span class="sub">(PNG transparente)</span>
+        </button>
+        <button id="record-btn" class="record-btn" type="button" disabled>Gravar vídeo</button>
+      </div>
     </aside>
 
     <section class="stage-wrap" aria-label="Pré-visualização do site na moldura escolhida">
@@ -114,15 +124,6 @@
         <div id="idle-placeholder" class="idle-placeholder">Digite uma URL e clique em Carregar</div>
         <div id="live-frame" class="live-frame hidden"></div>
         <div class="spinner hidden" id="spinner"><div class="spinner-ring"></div></div>
-      </div>
-
-      <div class="toolbar">
-        <div class="current-model" id="current-model-label">—</div>
-        <button id="zoom-btn" class="zoom-btn" type="button">Ver em 100%</button>
-        <button id="download-btn" class="download-btn" disabled>
-          Baixar moldura <span class="sub">(PNG transparente)</span>
-        </button>
-        <button id="record-btn" class="record-btn" type="button" disabled>Gravar vídeo</button>
       </div>
     </section>
   </main>
