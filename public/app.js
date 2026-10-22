@@ -133,6 +133,7 @@ const state = {
   standalone: false, // true = abre como app instalado (display-mode: standalone)
   recording: null,   // { rec, raf, inicio } enquanto um video esta sendo gravado
   brand: { logo: null, logoUrl: '', texto: '' }, // marca na base do notebook
+  pointer: null,     // { x, y, pressionado, visivel, ts } para o indicador de toque
   colorByModel: {},  // modelId -> id do preset escolhido
   customByModel: {}, // modelId -> cor personalizada (hex)
 };
@@ -318,6 +319,18 @@ function attachInputHandlers(canvasEl, vw, vh, mobile, gen) {
     if (gen !== state.sessionGen) return;
     if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.send(JSON.stringify(obj));
   };
+
+  // Guarda onde está o ponteiro só para a gravação desenhar o indicador de
+  // toque. Fica em listeners próprios, sem tocar nos que enviam a interação.
+  const marcarPonteiro = (e, pressionado) => {
+    const p = toDevice(e.clientX, e.clientY);
+    state.pointer = { x: p.x, y: p.y, pressionado, visivel: true, ts: Date.now() };
+  };
+  canvasEl.addEventListener('pointerdown', e => marcarPonteiro(e, true));
+  canvasEl.addEventListener('pointermove', e => marcarPonteiro(e, e.buttons === 1));
+  canvasEl.addEventListener('pointerup', e => marcarPonteiro(e, false));
+  canvasEl.addEventListener('wheel', e => marcarPonteiro(e, false), { passive: true });
+  canvasEl.addEventListener('pointerleave', () => { if (state.pointer) state.pointer.visivel = false; });
 
   if (mobile) {
     canvasEl.addEventListener('pointerdown', e => {
@@ -876,6 +889,7 @@ function startRecording() {
     // state.screenEl é o canvas da sessão; desenhar a partir dele pega o quadro
     // mais recente sem pedir nada ao servidor.
     paintMockup(c, m, state.screenEl, dims);
+    paintTouch(c, m);
     state.recording.raf = requestAnimationFrame(desenhar);
   };
 
@@ -1042,6 +1056,58 @@ function drawPhoneOrTablet(c, m, img) {
   c.fillRect(outerW, outerH * 0.2, btnW, outerH * 0.1);
 
   return { outerW, outerH };
+}
+
+// ---------- Indicador de toque ----------
+// O cursor do navegador não entra no vídeo: o canvas só recebe os quadros
+// vindos do servidor. Sem nenhuma marca, quem assiste não vê onde foi tocado e
+// a tela parece mudar sozinha. Então desenhamos no vídeo um círculo translúcido
+// na posição do ponteiro, como o indicador de toque dos mockups de celular.
+const TOQUE_RAIO = 21;        // perto do tamanho de uma ponta de dedo
+const TOQUE_SUMICO_MS = 900;  // tempo até desaparecer depois do último contato
+
+// Onde a tela começa dentro do mockup, por tipo de moldura.
+function screenOffset(m) {
+  if (m.type === 'laptop') {
+    const screenOuterW = m.viewport.w + m.bezel * 2;
+    return { x: screenOuterW * 0.035 + m.bezel, y: m.bezel };
+  }
+  if (m.type === 'browser') return { x: 0, y: 42 };
+  return { x: m.bezel, y: m.bezel };
+}
+
+function paintTouch(c, m) {
+  const t = state.pointer;
+  if (!t || !t.visivel) return;
+  const idade = Date.now() - t.ts;
+  if (!t.pressionado && idade > TOQUE_SUMICO_MS) return;
+
+  // Esmaece aos poucos depois que solta, em vez de sumir de repente.
+  const fade = t.pressionado ? 1 : Math.max(0, 1 - idade / TOQUE_SUMICO_MS);
+  const off = screenOffset(m);
+  const x = off.x + t.x;
+  const y = off.y + t.y;
+  const raio = TOQUE_RAIO * (t.pressionado ? 1.08 : 1);
+
+  c.save();
+  // Um halo escuro por baixo e o miolo claro por cima: assim a bolinha se vê
+  // tanto sobre um fundo branco quanto sobre um escuro, sem virar um borrão.
+  c.beginPath();
+  c.arc(x, y, raio, 0, Math.PI * 2);
+  c.fillStyle = `rgba(24,28,36,${0.22 * fade})`;
+  c.fill();
+
+  c.beginPath();
+  c.arc(x, y, raio * 0.72, 0, Math.PI * 2);
+  c.fillStyle = `rgba(255,255,255,${0.42 * fade})`;
+  c.fill();
+
+  c.lineWidth = 1.5;
+  c.strokeStyle = `rgba(255,255,255,${0.55 * fade})`;
+  c.beginPath();
+  c.arc(x, y, raio, 0, Math.PI * 2);
+  c.stroke();
+  c.restore();
 }
 
 // ---------- Marca na base do notebook ----------
